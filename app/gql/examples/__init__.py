@@ -1,0 +1,1 @@
+"""EXAMPLE / reference GraphQL code — teaching patterns, not part of the production API surface. Kept separate from app/gql/resolvers and app/gql/types so real, shipped resolvers never mix with reference-only ones in the same directory."""

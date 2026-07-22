@@ -1,0 +1,400 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Example queries/mutations for the real Patient GraphQL API
+# (app/gql/resolvers/patient.py, app/gql/types/patient.py).
+#
+# Paste any one of these into GraphiQL at /graphql (set an
+# `Authorization: Bearer <jwt>` header first — every field here requires the
+# matching `patient:read`/`patient:create`/`patient:update`/`patient:delete`
+# permission). Variables for each operation are given right below it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Fetch EVERY field on a Patient — the "give me everything" query ─────────
+# GraphQL has no SELECT *-style wildcard — every field you want, at every
+# nesting level, has to be spelled out explicitly. This is the full list, one
+# field per line for every scalar plus every sub-resource array's own fields
+# (including the doubly-nested contact.relationship[]/contact.telecom[]).
+# Contrast with GET /api/v1/patients/{id}, which always returns this exact
+# shape whether you ask for it or not — see GetPatientScalarsOnly below for
+# the opposite extreme (only 3 fields), which GraphQL lets you do for free.
+
+query GetPatientEverything($patientId: Int!) {
+  patient(patientId: $patientId) {
+    id
+    userId
+    orgId
+    active
+    gender
+    birthDate
+    deceasedBoolean
+    deceasedDatetime
+    maritalStatusSystem
+    maritalStatusCode
+    maritalStatusDisplay
+    maritalStatusText
+    multipleBirthBoolean
+    multipleBirthInteger
+    managingOrganizationType
+    managingOrganizationId
+    managingOrganizationDisplay
+    createdAt
+    updatedAt
+    createdBy
+    updatedBy
+    name {
+      id
+      use
+      text
+      family
+      given
+      prefix
+      suffix
+      periodStart
+      periodEnd
+    }
+    identifier {
+      id
+      use
+      typeSystem
+      typeCode
+      typeDisplay
+      typeText
+      system
+      value
+      periodStart
+      periodEnd
+      assigner
+    }
+    telecom {
+      id
+      system
+      value
+      use
+      rank
+      periodStart
+      periodEnd
+    }
+    address {
+      id
+      use
+      type
+      text
+      line
+      city
+      district
+      state
+      postalCode
+      country
+      periodStart
+      periodEnd
+    }
+    photo {
+      id
+      contentType
+      language
+      data
+      url
+      size
+      hash
+      title
+      creation
+    }
+    contact {
+      id
+      relationship {
+        id
+        codingSystem
+        codingCode
+        codingDisplay
+        text
+      }
+      nameUse
+      nameText
+      nameFamily
+      nameGiven
+      namePrefix
+      nameSuffix
+      telecom {
+        id
+        system
+        value
+        use
+        rank
+        periodStart
+        periodEnd
+      }
+      addressUse
+      addressType
+      addressText
+      addressLine
+      addressCity
+      addressDistrict
+      addressState
+      addressPostalCode
+      addressCountry
+      addressPeriodStart
+      addressPeriodEnd
+      gender
+      organizationType
+      organizationId
+      organizationDisplay
+      periodStart
+      periodEnd
+    }
+    communication {
+      id
+      languageSystem
+      languageCode
+      languageDisplay
+      languageText
+      preferred
+    }
+    generalPractitioner {
+      id
+      referenceType
+      referenceId
+      referenceDisplay
+    }
+    link {
+      id
+      otherType
+      otherId
+      otherDisplay
+      type
+    }
+  }
+}
+
+# Variables:
+# { "patientId": 1 }
+
+# ── Fetch a single Patient, every sub-resource in one round trip ────────────
+# GraphQL's headline advantage over REST: ask for exactly the fields you want.
+# Compare to GET /api/v1/patients/{id}, which always returns every sub-resource
+# array whether you need it or not.
+
+query GetPatient($patientId: Int!) {
+  patient(patientId: $patientId) {
+    id
+    gender
+    birthDate
+    active
+    name {
+      family
+      given
+    }
+    identifier {
+      system
+      value
+    }
+    telecom {
+      system
+      value
+    }
+    generalPractitioner {
+      referenceType
+      referenceId
+    }
+  }
+}
+
+# Variables:
+# { "patientId": 1 }
+
+# ── The same query, but asking for only scalar fields ───────────────────────
+# Contrast with the query above: PatientType still builds every sub-resource
+# array server-side either way (see app/gql/examples/patient_lazy_types.py's
+# docstring for why, and PatientLazyType below for the fix) — but this shows
+# the client-facing part of "ask for only what you need" that GraphQL gives
+# you regardless.
+
+query GetPatientScalarsOnly($patientId: Int!) {
+  patient(patientId: $patientId) {
+    id
+    gender
+    birthDate
+    active
+  }
+}
+
+# ── The caller's own Patient record, resolved from the JWT ──────────────────
+
+query GetMyPatient {
+  myPatient {
+    id
+    gender
+    name {
+      family
+      given
+    }
+  }
+}
+
+# ── List Patients with the advanced filter set ───────────────────────────────
+# Mirrors GET /api/v1/patients/?... — every filter added to the fhir-server's
+# PatientRepository.list() (see dev-docs/12-search-and-filter-standards.md) is
+# available here too, plus sort/totalMode.
+
+query ListPatients(
+  $familyName: String
+  $birthDateFrom: Date
+  $birthDateTo: Date
+  $addressCity: String
+  $sort: String
+  $limit: Int
+  $offset: Int
+) {
+  patients(
+    familyName: $familyName
+    birthDateFrom: $birthDateFrom
+    birthDateTo: $birthDateTo
+    addressCity: $addressCity
+    sort: $sort
+    limit: $limit
+    offset: $offset
+  ) {
+    total
+    limit
+    offset
+    data {
+      id
+      name {
+        family
+        given
+      }
+      birthDate
+    }
+  }
+}
+
+# Variables:
+# {
+#   "familyName": "Smith",
+#   "birthDateFrom": "1980-01-01",
+#   "birthDateTo": "1999-12-31",
+#   "addressCity": "Spring",
+#   "sort": "-birthDate",
+#   "limit": 20,
+#   "offset": 0
+# }
+
+# ── List Patients by reference filters (generalPractitioner / organization) ─
+
+query ListPatientsByGeneralPractitioner(
+  $gpType: GeneralPractitionerReferenceType!
+  $gpId: Int!
+) {
+  patients(generalPractitionerType: $gpType, generalPractitionerId: $gpId) {
+    total
+    data {
+      id
+      name {
+        family
+      }
+    }
+  }
+}
+
+# Variables:
+# { "gpType": "Practitioner", "gpId": 42 }
+# Allowed values: Organization | Practitioner | PractitionerRole — these are
+# unquoted identifiers when written as an inline literal instead of a
+# variable, e.g. `patients(generalPractitionerType: Practitioner, ...)`.
+
+# ── Skip the total count on a large result set ───────────────────────────────
+
+query ListPatientsFastPage($limit: Int, $offset: Int) {
+  patients(totalMode: none, limit: $limit, offset: $offset) {
+    total # comes back null when totalMode: none
+    data {
+      id
+    }
+  }
+}
+
+# ── Create a Patient ─────────────────────────────────────────────────────────
+
+mutation CreatePatient($input: PatientCreateInput!) {
+  createPatient(input: $input) {
+    id
+    userId
+    orgId
+    gender
+  }
+}
+
+# Variables:
+# {
+#   "input": {
+#     "userId": "u-123",
+#     "orgId": "org-1",
+#     "gender": "male",
+#     "birthDate": "1990-05-20"
+#   }
+# }
+
+# ── Create a Patient with sub-resources atomically ───────────────────────────
+
+mutation CreatePatientFull($input: PatientFullCreateInput!) {
+  createPatientFull(input: $input) {
+    id
+    name {
+      family
+      given
+    }
+    identifier {
+      value
+    }
+  }
+}
+
+# Variables:
+# {
+#   "input": {
+#     "userId": "u-123",
+#     "orgId": "org-1",
+#     "gender": "female",
+#     "names": [{ "family": "Doe", "given": ["Jane"] }],
+#     "identifiers": [{ "value": "MRN-100" }]
+#   }
+# }
+
+# ── Update scalar fields ─────────────────────────────────────────────────────
+
+mutation UpdatePatient($patientId: Int!, $input: PatientPatchInput!) {
+  updatePatient(patientId: $patientId, input: $input) {
+    id
+    active
+    gender
+  }
+}
+
+# Variables:
+# { "patientId": 1, "input": { "active": false } }
+
+# ── Delete a Patient ─────────────────────────────────────────────────────────
+
+mutation DeletePatient($patientId: Int!) {
+  deletePatient(patientId: $patientId)
+}
+
+# ── Sub-resource mutation example (Name) ─────────────────────────────────────
+# The same add/patch/delete shape repeats identically for every one of the
+# nine sub-resource types (identifier, telecom, address, photo, contact,
+# communication, generalPractitioner, link) — see app/gql/resolvers/patient.py.
+
+mutation AddPatientName($patientId: Int!, $input: NameCreateInput!) {
+  addPatientName(patientId: $patientId, input: $input) {
+    id
+    name {
+      family
+      given
+    }
+  }
+}
+
+# Variables:
+# { "patientId": 1, "input": { "family": "Smith", "given": ["Alice"] } }
+
+mutation DeletePatientName($patientId: Int!, $nameId: Int!) {
+  deletePatientName(patientId: $patientId, nameId: $nameId)
+}

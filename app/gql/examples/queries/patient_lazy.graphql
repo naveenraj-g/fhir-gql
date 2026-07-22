@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Example queries for the EXAMPLE lazy-resolver Patient fields
+# (app/gql/examples/patient_lazy_resolvers.py, patient_lazy_types.py).
+#
+# These fields (patientLazy/patientsLazy) exist alongside — not instead of —
+# the real patient/patients fields in patient.graphql. They demonstrate the
+# same data via per-sub-resource lazy field resolvers instead of one eager
+# fetch; see app/gql/examples/patient_lazy_types.py's docstring for the full
+# concurrency explanation these queries are meant to illustrate.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── PURE PARALLEL case: patientId already known ──────────────────────────────
+# `name` and `identifier` below are independent lazy fields — since patientId
+# is already a query argument, graphql-core resolves both concurrently the
+# moment they're requested together. Try requesting just `id` and `gender`
+# alone (no sub-resource fields) to see that NONE of the list_*() fhir-server
+# calls fire at all when nothing selects them.
+
+query GetPatientLazy($patientId: Int!) {
+  patientLazy(patientId: $patientId) {
+    id
+    gender
+    name {
+      family
+      given
+    }
+    identifier {
+      value
+    }
+    generalPractitioner {
+      referenceType
+      referenceId
+    }
+  }
+}
+
+# Variables:
+# { "patientId": 1 }
+
+
+# ── Only scalar fields — proves no sub-resource fetch happens at all ────────
+# Compare fhir-server request logs between this query and the one above: this
+# one should trigger zero list_names()/list_identifiers()/etc. calls, since
+# none of those lazy fields are in the selection set.
+
+query GetPatientLazyScalarsOnly($patientId: Int!) {
+  patientLazy(patientId: $patientId) {
+    id
+    gender
+    birthDate
+  }
+}
+
+
+# ── DEPENDENT-AT-LIST-SCALE case: patientId not known up front ──────────────
+# Each patient's own `id` only exists once `patientsLazy`'s own list query
+# resolves — every one of these patients' `name`/`identifier` sub-fields
+# necessarily runs after that patient's row comes back, but still
+# concurrently across different patients and across different sub-resource
+# fields within the same patient. See app/gql/examples/patient_lazy_resolvers.py's
+# module docstring for the N+1 caveat this pattern does not solve on its own.
+
+query ListPatientsLazy($familyName: String, $limit: Int, $offset: Int) {
+  patientsLazy(familyName: $familyName, limit: $limit, offset: $offset) {
+    id
+    name {
+      family
+      given
+    }
+    identifier {
+      value
+    }
+  }
+}
+
+# Variables:
+# { "familyName": "Smith", "limit": 5, "offset": 0 }
