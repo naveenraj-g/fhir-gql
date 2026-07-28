@@ -52,6 +52,7 @@ so nothing here misdescribes something as missing that already exists). Two inde
 | 10 | [resource-rollout-plan.md](10-resource-rollout-plan.md) | Which FHIR resources to add next, in what order, and how much REST vs. GraphQL work each needs |
 | 11 | [implementation-roadmap.md](11-implementation-roadmap.md) | **Master roadmap** — phased build order synthesizing all reports above, with explicit fhir-gql / fhir-server / shared-IAM ownership per item |
 | 12 | [search-and-filter-standards.md](12-search-and-filter-standards.md) | Every filter every resource's list/search endpoint should support — universal FHIR params, per-resource matrix, value-type behavior, build order |
+| 13 | [workflow-orchestration.md](13-workflow-orchestration.md) | Where business/workflow rules live as resources' Services grow — same-resource vs. cross-resource vs. cross-cutting, worked example (Organization `partof`), and the planned `app/workflows/` tier for the first cross-resource case (Appointment booking) |
 
 Each report uses one consistent per-feature template: **What it does / Source files / How it works /
 Belongs in / Port notes / Priority**, closing with a summary table and a "Recommended next steps"

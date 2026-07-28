@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Annotated, Optional
+from typing import Annotated
 
 import strawberry
 
@@ -56,27 +56,25 @@ class PatientQuery:
     async def patients(
         self,
         info: strawberry.types.Info,
-        family_name: Optional[str] = None,
-        given_name: Optional[str] = None,
-        gender: Optional[AdministrativeGenderEnum] = None,
-        active: Optional[bool] = None,
-        user_id: Optional[str] = None,
-        org_id: Optional[str] = None,
-        identifier: Optional[str] = None,
-        birth_date_from: Optional[date] = None,
-        birth_date_to: Optional[date] = None,
-        address_city: Optional[str] = None,
-        address_state: Optional[str] = None,
-        address_postal_code: Optional[str] = None,
-        email: Optional[str] = None,
-        phone: Optional[str] = None,
-        deceased: Optional[bool] = None,
-        general_practitioner_type: Optional[
-            GeneralPractitionerReferenceTypeEnum
-        ] = None,
-        general_practitioner_id: Optional[int] = None,
-        organization_id: Optional[int] = None,
-        sort: Optional[str] = None,
+        family_name: str | None = None,
+        given_name: str | None = None,
+        gender: AdministrativeGenderEnum | None = None,
+        active: bool | None = None,
+        user_id: str | None = None,
+        org_id: str | None = None,
+        identifier: str | None = None,
+        birth_date_from: date | None = None,
+        birth_date_to: date | None = None,
+        address_city: str | None = None,
+        address_state: str | None = None,
+        address_postal_code: str | None = None,
+        email: str | None = None,
+        phone: str | None = None,
+        deceased: bool | None = None,
+        general_practitioner_type: GeneralPractitionerReferenceTypeEnum | None = None,
+        general_practitioner_id: int | None = None,
+        organization_id: int | None = None,
+        sort: str | None = None,
         total_mode: TotalModeEnum = TotalModeEnum.accurate,
         limit: int = 50,
         offset: int = 0,

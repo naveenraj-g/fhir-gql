@@ -24,15 +24,18 @@ from app.schemas.enums import (
     AdministrativeGender,
     ContactPointSystem,
     ContactPointUse,
+    DayOfWeek,
     HumanNameUse,
     IdentifierUse,
     TotalMode,
 )
+from app.schemas.location.enums import LocationMode, LocationStatus
 from app.schemas.patient.enums import (
     GeneralPractitionerReferenceType,
     PatientLinkOtherType,
     PatientLinkType,
 )
+from app.schemas.slot.enums import SlotStatus
 
 # ── Shared FHIR code-set enums (app.schemas.enums) ────────────────────────────
 AddressTypeEnum = strawberry.enum(AddressType)
@@ -43,6 +46,7 @@ ContactPointUseEnum = strawberry.enum(ContactPointUse)
 HumanNameUseEnum = strawberry.enum(HumanNameUse)
 IdentifierUseEnum = strawberry.enum(IdentifierUse)
 TotalModeEnum = strawberry.enum(TotalMode)
+DayOfWeekEnum = strawberry.enum(DayOfWeek)
 
 # ── Patient-specific enums (app.schemas.patient.enums) ────────────────────────
 GeneralPractitionerReferenceTypeEnum = strawberry.enum(GeneralPractitionerReferenceType)
@@ -51,3 +55,10 @@ PatientLinkOtherTypeEnum = strawberry.enum(PatientLinkOtherType)
 # otherwise collide with the GraphQL *object* type of the same name in
 # app/gql/types/patient.py (the wrapper for PatientLinkResponse).
 PatientLinkTypeEnum = strawberry.enum(PatientLinkType, name="PatientLinkTypeCode")
+
+# ── Location-specific enums (app.schemas.location.enums) ──────────────────────
+LocationStatusEnum = strawberry.enum(LocationStatus)
+LocationModeEnum = strawberry.enum(LocationMode)
+
+# ── Slot-specific enums (app.schemas.slot.enums) ───────────────────────────────
+SlotStatusEnum = strawberry.enum(SlotStatus)

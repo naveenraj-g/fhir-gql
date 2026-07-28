@@ -13,25 +13,59 @@ from strawberry.fastapi import GraphQLRouter
 
 from app.config import settings
 from app.gql.context import get_context
+from app.gql.healthcare_service.mutations import HealthcareServiceMutation
+from app.gql.healthcare_service.queries import HealthcareServiceQuery
+from app.gql.location.mutations import LocationMutation
+from app.gql.location.queries import LocationQuery
+from app.gql.organization.mutations import OrganizationMutation
+from app.gql.organization.queries import OrganizationQuery
 from app.gql.patient.mutations import PatientMutation
 from app.gql.patient.queries import PatientQuery
+from app.gql.practitioner.mutations import PractitionerMutation
+from app.gql.practitioner.queries import PractitionerQuery
+from app.gql.practitioner_role.mutations import PractitionerRoleMutation
+from app.gql.practitioner_role.queries import PractitionerRoleQuery
+from app.gql.schedule.mutations import ScheduleMutation
+from app.gql.schedule.queries import ScheduleQuery
+from app.gql.slot.mutations import SlotMutation
+from app.gql.slot.queries import SlotQuery
 from app.gql.test_subscription import TestSubscription
 
 
 @strawberry.type
-class Query(PatientQuery):
+class Query(
+    PatientQuery,
+    OrganizationQuery,
+    LocationQuery,
+    HealthcareServiceQuery,
+    PractitionerQuery,
+    PractitionerRoleQuery,
+    ScheduleQuery,
+    SlotQuery,
+):
     """
     Root GraphQL query type — merges every domain's query fields via mixin
-    inheritance. This patient-only slice mixes in `PatientQuery` (the real
-    API) plus `PatientLazyQuery` (an EXAMPLE mixin demonstrating lazy/
-    parallel/dependent resolver composition — see
-    app/gql/examples/patient_lazy_resolvers.py). Add further resources' Query
-    mixins here alongside them as they are ported over.
+    inheritance. Mixes in `PatientQuery`, `OrganizationQuery`,
+    `LocationQuery`, `HealthcareServiceQuery`, `PractitionerQuery`,
+    `PractitionerRoleQuery`, `ScheduleQuery`, and `SlotQuery` (the real
+    APIs) plus `PatientLazyQuery` (an EXAMPLE mixin demonstrating
+    lazy/parallel/dependent resolver composition — see
+    app/gql/examples/patient_lazy_resolvers.py). Add further resources'
+    Query mixins here alongside them as they are ported over.
     """
 
 
 @strawberry.type
-class Mutation(PatientMutation):
+class Mutation(
+    PatientMutation,
+    OrganizationMutation,
+    LocationMutation,
+    HealthcareServiceMutation,
+    PractitionerMutation,
+    PractitionerRoleMutation,
+    ScheduleMutation,
+    SlotMutation,
+):
     """Root GraphQL mutation type — merges every domain's mutation fields via mixin inheritance."""
 
 

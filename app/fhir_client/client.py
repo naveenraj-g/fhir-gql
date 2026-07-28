@@ -62,8 +62,8 @@ class FhirClient:
         Handles three cases:
           1. 204 No Content — successful operation with no body (e.g. DELETE). Returns None.
           2. 4xx/5xx — raises HTTPException with the FHIR Server's status code and
-             the `detail` field from its JSON error body (falls back to raw text if
-             the body is not valid JSON).
+             a detail message extracted from its FHIR `OperationOutcome` error body
+             (falls back to raw text if the body isn't JSON or isn't an OperationOutcome).
           3. 2xx with body — parses and returns the JSON dict.
 
         Args:
@@ -84,17 +84,65 @@ class FhirClient:
             # raise_for_status() raises httpx.HTTPStatusError on 4xx/5xx.
             r.raise_for_status()
         except httpx.HTTPStatusError:
-            # Forward the FHIR Server's own error detail to the API consumer.
-            # Try to extract a `detail` field from the JSON body first; fall back to
-            # the raw response text if the body is not valid JSON (e.g. HTML error page).
-            try:
-                detail = r.json().get("detail", r.text)
-            except Exception:
-                detail = r.text
-            raise HTTPException(status_code=r.status_code, detail=detail)
+            raise HTTPException(
+                status_code=r.status_code, detail=self._extract_detail(r)
+            )
         return r.json()
 
-    async def post(self, path: str, data: dict, actor: AuthUser, accept: str | None = None, inject_audit: bool = True) -> dict:
+    @staticmethod
+    def _extract_detail(r: httpx.Response) -> str | list[dict]:
+        """
+        Extract a client-facing error message from the FHIR Server's response body.
+
+        The FHIR Server does not use a flat `{"detail": ...}` shape — every error
+        (validation, not-found, conflict, unhandled) is normalised by its own global
+        handlers into a FHIR `OperationOutcome` resource, e.g.:
+            {"resourceType": "OperationOutcome", "issue": [
+                {"severity": "error", "code": "invalid",
+                 "diagnostics": "Schedule 'Schedule/9' not found.",
+                 "expression": ["schedule"]}
+            ]}
+        `expression` (a field path) is only present for field-level validation errors.
+
+        A single issue with no `expression` collapses to a plain string so the common
+        case (a single 404/409/422 message) stays a simple string, matching what most
+        API consumers already expect. Multiple issues, or any issue carrying an
+        `expression`, produce a `list[dict]` of `{"field": ..., "message": ...}`
+        entries — deliberately the same shape FastAPI's own `RequestValidationError`
+        produces (see `validation_exception_handler` in app/main.py), so REST/GraphQL
+        consumers don't need a second branch for FHIR-Server-sourced 422s.
+        """
+        try:
+            body = r.json()
+        except Exception:
+            return r.text
+
+        if not isinstance(body, dict) or body.get("resourceType") != "OperationOutcome":
+            return r.text
+
+        issues = body.get("issue") or []
+        if not issues:
+            return r.text
+
+        if len(issues) == 1 and not issues[0].get("expression"):
+            return issues[0].get("diagnostics", r.text)
+
+        return [
+            {
+                "field": (issue.get("expression") or [None])[0],
+                "message": issue.get("diagnostics"),
+            }
+            for issue in issues
+        ]
+
+    async def post(
+        self,
+        path: str,
+        data: dict,
+        actor: AuthUser,
+        accept: str | None = None,
+        inject_audit: bool = True,
+    ) -> dict:
         """
         Send a POST (create) request to the FHIR Server.
 
@@ -127,7 +175,14 @@ class FhirClient:
         r = await self._http.post(path, json=body, headers=extra_headers)
         return await self._handle(r)
 
-    async def patch(self, path: str, data: dict, actor: AuthUser, accept: str | None = None, inject_audit: bool = True) -> dict:
+    async def patch(
+        self,
+        path: str,
+        data: dict,
+        actor: AuthUser,
+        accept: str | None = None,
+        inject_audit: bool = True,
+    ) -> dict:
         """
         Send a PATCH (partial update) request to the FHIR Server.
 
@@ -152,7 +207,9 @@ class FhirClient:
         r = await self._http.patch(path, json=body, headers=extra_headers)
         return await self._handle(r)
 
-    async def get(self, path: str, params: dict | None = None, accept: str | None = None) -> dict:
+    async def get(
+        self, path: str, params: dict | None = None, accept: str | None = None
+    ) -> dict:
         """
         Send a GET request to the FHIR Server.
 

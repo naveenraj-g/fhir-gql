@@ -171,3 +171,24 @@ class TotalMode(str, Enum):
 
     accurate = "accurate"
     none = "none"
+
+
+class DayOfWeek(str, Enum):
+    """
+    FHIR days-of-week code set.
+
+    Was Location-specific (Location.hoursOfOperation.daysOfWeek) until
+    HealthcareService.availableTime/notAvailable needed the identical set —
+    a second consumer moves it here, matching the shared-vs-resource-specific
+    rule used for the rest of app.schemas.enums.
+
+    Values defined by https://hl7.org/fhir/R4/valueset-days-of-week.html.
+    """
+
+    mon = "mon"
+    tue = "tue"
+    wed = "wed"
+    thu = "thu"
+    fri = "fri"
+    sat = "sat"
+    sun = "sun"

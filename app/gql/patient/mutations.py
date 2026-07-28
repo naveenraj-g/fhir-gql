@@ -2,7 +2,7 @@ import strawberry
 
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
-from app.gql.patient.types.types import (
+from app.gql.patient.types.input import (
     AddressCreateInput,
     AddressPatchInput,
     CommunicationCreateInput,
@@ -21,12 +21,12 @@ from app.gql.patient.types.types import (
     PatientFullCreateInput,
     PatientFullPatchInput,
     PatientPatchInput,
-    PatientType,
     PhotoCreateInput,
     PhotoPatchInput,
     TelecomCreateInput,
     TelecomPatchInput,
 )
+from app.gql.patient.types.types import PatientType
 from app.gql.permissions import require_gql_permission
 from app.schemas.patient.response import (
     PatientResponse,

@@ -84,12 +84,14 @@ async def validate_reference(
         HTTPException(404): If the referenced resource doesn't exist, or belongs to a different tenant.
     """
     prefix = f"{resource_type}/"
-    id_str = ref[len(prefix):] if ref.startswith(prefix) else ""
+    id_str = ref[len(prefix) :] if ref.startswith(prefix) else ""
     if not id_str.isdigit():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"{field_name} must be a reference in the form '{prefix}<id>', got '{ref}'.",
         )
     resource = await get_by_id(int(id_str))
-    check_tenant_ownership(resource, actor, not_found_detail=f"{resource_type} not found.")
+    check_tenant_ownership(
+        resource, actor, not_found_detail=f"{resource_type} not found."
+    )
     return resource

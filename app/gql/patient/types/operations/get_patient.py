@@ -1,5 +1,3 @@
-from typing import List
-
 import strawberry
 
 from app.gql.context import get_container
@@ -86,8 +84,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def name(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientNameType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientNameType]:
         return await list_names_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -95,8 +93,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def identifier(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientIdentifierType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientIdentifierType]:
         return await list_identifiers_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -104,8 +102,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def telecom(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientTelecomType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientTelecomType]:
         return await list_telecom_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -113,8 +111,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def address(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientAddressType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientAddressType]:
         return await list_address_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -122,8 +120,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def photo(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientPhotoType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientPhotoType]:
         return await list_photo_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -131,8 +129,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def contact(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientContactType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientContactType]:
         return await list_contact_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -140,8 +138,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def communication(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientCommunicationType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientCommunicationType]:
         return await list_communication_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -149,8 +147,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def general_practitioner(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientGeneralPractitionerType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientGeneralPractitionerType]:
         return await list_general_practitioner_for_patient(parent.id, info)
 
     @strawberry.field(
@@ -158,8 +156,8 @@ class PatientCoreType:
     )
     @staticmethod
     async def link(
-        parent: strawberry.Parent["PatientCoreType"], info: strawberry.types.Info
-    ) -> List[PatientLinkType]:
+        parent: strawberry.Parent[PatientCoreType], info: strawberry.types.Info
+    ) -> list[PatientLinkType]:
         return await list_link_for_patient(parent.id, info)
 
 
