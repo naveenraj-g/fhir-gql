@@ -210,8 +210,9 @@ _SUBRES_LINKS_200 = {
     summary="Create a Patient",
     description=(
         "Creates a new Patient resource. "
-        "`user_id` and `org_id` are required for tenant scoping. "
-        "`created_by` is stamped automatically from the caller's JWT — do not supply it. "
+        "`user_id` is required to link the record to a portal user. "
+        "`org_id` is NOT a request field — fhir-server derives it from the caller's "
+        "verified JWT. `created_by` is likewise stamped automatically from that JWT. "
         "Send `Accept: application/fhir+json` to receive the result in FHIR R4 format."
     ),
     responses={**_SINGLE_201, **_ERR_VALIDATION},
@@ -368,8 +369,12 @@ async def get_patient_core(
     summary="List Patients",
     description=(
         "Returns a paginated list of Patient resources. "
-        "Filter by `family_name` or `given_name` (partial, case-insensitive), "
-        "`gender`, `active`, `user_id`, or `org_id`. "
+        "Filter by `family`/`given`/`name` (partial, case-insensitive), `gender`, `active`, "
+        "`user_id`, `identifier`, `birthdate`/`death-date` (comparator-prefixed, repeatable), "
+        "`deceased`, `address`/`address-city`/`address-state`/`address-postalcode`/"
+        "`address-country`/`address-use`, `telecom`/`email`/`phone`, `language`, "
+        "`general-practitioner`/`organization`/`link` (FHIR reference strings). "
+        "`org_id` is not a filter — Patient reads always scope to the caller's own org. "
         "Use `limit` and `offset` for pagination (default limit: 50, max: 200). "
         "Send `Accept: application/fhir+json` to receive a FHIR Bundle searchset."
     ),

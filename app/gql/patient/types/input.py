@@ -238,12 +238,14 @@ class LinkPatchInput:
     model=PatientCreateSchema,
     all_fields=True,
     description=(
-        "Input for `createPatient`. `userId` and `orgId` are required for tenant scoping; "
-        "`createdBy` is stamped automatically from the caller's JWT — do not supply it."
+        "Input for `createPatient`. `userId` is required to link the record to a portal "
+        "user. `orgId` is NOT a field here — fhir-server derives it from the caller's "
+        "verified JWT (`activeOrganizationId` claim). `createdBy` is likewise stamped "
+        "automatically from that same verified JWT — do not supply either."
     ),
 )
 class PatientCreateInput:
-    """Input for `createPatient` — mirrors PatientCreateSchema, including its `user_id`/`org_id` requirement."""
+    """Input for `createPatient` — mirrors PatientCreateSchema; `user_id` required, `org_id` not accepted at all."""
 
 
 @strawberry.experimental.pydantic.input(

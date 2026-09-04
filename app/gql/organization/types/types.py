@@ -1,6 +1,6 @@
 """
 GraphQL response (output) types for the Organization resource, derived from
-the existing Pydantic schemas in app/schemas/organization/response.py via
+the Pydantic schemas in app/schemas/organization/response.py via
 `strawberry.experimental.pydantic`. Input types live in
 app/gql/organization/types/input.py — this split mirrors the
 app/schemas/organization/{response,input}.py split one layer down.
@@ -16,126 +16,126 @@ Declaration order matters: `strawberry.experimental.pydantic` resolves a
 wrapped model's nested-model fields by looking up the nested Pydantic class
 in its own registry, which only has entries for classes wrapped *before*
 the parent is declared. Leaf sub-resource types are therefore declared
-first, the top-level `OrgType` / `PaginatedOrgType` last.
+first, the top-level `OrganizationType` / `PaginatedOrganizationType` last.
 """
 
 import strawberry
 
 from app.schemas.organization.response import (
-    OrgAddressResponse,
-    OrgAliasResponse,
-    OrgContactResponse,
-    OrgContactTelecomResponse,
-    OrgEndpointResponse,
-    OrgIdentifierResponse,
-    OrgResponse,
-    OrgTelecomResponse,
-    OrgTypeResponse,
-    PaginatedOrgResponse,
+    OrganizationAddressResponse,
+    OrganizationAliasResponse,
+    OrganizationContactResponse,
+    OrganizationContactTelecomResponse,
+    OrganizationEndpointResponse,
+    OrganizationIdentifierResponse,
+    OrganizationResponse,
+    OrganizationTelecomResponse,
+    OrganizationTypeResponse,
+    PaginatedOrganizationResponse,
 )
 
 # ── Response (output) types — leaf sub-resources first ───────────────────────
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgIdentifierResponse,
+    model=OrganizationIdentifierResponse,
     all_fields=True,
     description="A single Organization.identifier entry.",
 )
-class OrgIdentifierType:
+class OrganizationIdentifierType:
     """A single Organization.identifier entry."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgTypeResponse,
+    model=OrganizationTypeResponse,
     all_fields=True,
     description="A single Organization.type CodeableConcept entry categorising the organization (e.g. prov = Healthcare Provider, dept = Hospital Department).",
 )
-class OrgTypeType:
+class OrganizationTypeType:
     """A single Organization.type CodeableConcept entry (e.g. prov, dept)."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgAliasResponse,
+    model=OrganizationAliasResponse,
     all_fields=True,
     description="A single Organization.alias entry — an alternative name the organization is or was known by.",
 )
-class OrgAliasType:
+class OrganizationAliasType:
     """A single Organization.alias entry."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgTelecomResponse,
+    model=OrganizationTelecomResponse,
     all_fields=True,
     description="A single Organization.telecom (ContactPoint) entry — phone, email, fax, etc.",
 )
-class OrgTelecomType:
+class OrganizationTelecomType:
     """A single Organization.telecom (ContactPoint) entry."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgAddressResponse,
+    model=OrganizationAddressResponse,
     all_fields=True,
     description="A single Organization.address entry.",
 )
-class OrgAddressType:
+class OrganizationAddressType:
     """A single Organization.address entry."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgContactTelecomResponse,
+    model=OrganizationContactTelecomResponse,
     all_fields=True,
     description="A single telecom entry nested inside an Organization.contact person.",
 )
-class OrgContactTelecomType:
+class OrganizationContactTelecomType:
     """A single telecom entry nested inside an Organization.contact person."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgContactResponse,
+    model=OrganizationContactResponse,
     all_fields=True,
     description="A single Organization.contact person — someone contactable about the organization in a specific capacity (admin, billing, clinical, etc.), with nested telecom entries.",
 )
-class OrgContactType:
-    """A single Organization.contact person (references OrgContactTelecomType)."""
+class OrganizationContactType:
+    """A single Organization.contact person (references OrganizationContactTelecomType)."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgEndpointResponse,
+    model=OrganizationEndpointResponse,
     all_fields=True,
     description="A single Organization.endpoint reference to a technical endpoint (e.g. SMART on FHIR, Direct Messaging) associated with the organization.",
 )
-class OrgEndpointType:
+class OrganizationEndpointType:
     """A single Organization.endpoint reference."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=OrgResponse,
+    model=OrganizationResponse,
     all_fields=True,
     description="A full Organization resource, including all nested sub-resource arrays (identifiers, types, aliases, telecoms, addresses, contacts, endpoints).",
 )
-class OrgType:
+class OrganizationType:
     """A full Organization resource, including all nested sub-resource arrays."""
 
 
 @strawberry.experimental.pydantic.type(
-    model=PaginatedOrgResponse,
+    model=PaginatedOrganizationResponse,
     all_fields=True,
     description="Paginated envelope returned by the `organizations` query — `data` for the current page, plus `total`/`limit`/`offset` for pagination.",
 )
-class PaginatedOrgType:
+class PaginatedOrganizationType:
     """Paginated envelope returned by the `organizations` list query."""
 
 
 __all__ = [
-    "OrgIdentifierType",
-    "OrgTypeType",
-    "OrgAliasType",
-    "OrgTelecomType",
-    "OrgAddressType",
-    "OrgContactTelecomType",
-    "OrgContactType",
-    "OrgEndpointType",
-    "OrgType",
-    "PaginatedOrgType",
+    "OrganizationIdentifierType",
+    "OrganizationTypeType",
+    "OrganizationAliasType",
+    "OrganizationTelecomType",
+    "OrganizationAddressType",
+    "OrganizationContactTelecomType",
+    "OrganizationContactType",
+    "OrganizationEndpointType",
+    "OrganizationType",
+    "PaginatedOrganizationType",
 ]

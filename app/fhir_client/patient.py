@@ -10,9 +10,16 @@ Sub-resources (names, identifiers, telecom, addresses, photos, contacts,
 communications, general_practitioners, links) are managed via dedicated
 sub-routes on the fhir-server.
 
-All sub-resource schemas use extra="forbid" and contain no created_by /
-updated_by fields, so every sub-resource POST and PATCH passes inject_audit=False
-to prevent FhirClient from injecting those fields into the body.
+Every method takes `actor: AuthUser` and forwards it to FhirClient so the
+Authorization header reaches the fhir-server — Patient is the one resource
+the fhir-server authenticates directly (JWT + RBAC), rather than trusting the
+gateway unconditionally like every other resource.
+
+All create/patch calls pass inject_audit=False: fhir-server derives
+created_by/updated_by from the verified JWT's `sub` claim itself for Patient,
+and its schemas (extra="forbid") no longer declare those fields at all — if
+FhirClient injected them into the body here, fhir-server would reject the
+request with 422.
 
 Reference: https://hl7.org/fhir/R4/patient.html
 """
@@ -49,17 +56,18 @@ class PatientClient:
         """
         POST /patients — create a new Patient resource.
 
-        FhirClient.post() stamps `created_by: actor.sub` automatically.
+        inject_audit=False: fhir-server stamps created_by from the verified
+        JWT's sub claim itself; its schema no longer accepts the field.
 
         Args:
             data:   Serialised PatientCreateSchema (exclude_none=True applied upstream).
-            actor:  Authenticated caller — used by FhirClient to stamp created_by.
+            actor:  Authenticated caller — forwarded as the Authorization header.
             accept: Content-type preference forwarded to the fhir-server.
 
         Returns:
             The newly created Patient dict (plain JSON or FHIR R4).
         """
-        return await self._fhir.post(_PATH, data, actor, accept=accept)
+        return await self._fhir.post(_PATH, data, actor, accept=accept, inject_audit=False)
 
     async def create_full(self, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """
@@ -67,17 +75,17 @@ class PatientClient:
 
         The fhir-server wraps every insert in a single DB transaction so the
         Patient and all provided sub-resource rows are created together or not
-        at all. FhirClient.post() stamps `created_by: actor.sub` automatically.
+        at all. inject_audit=False — see create()'s docstring.
 
         Args:
             data:   Serialised PatientFullCreateSchema (exclude_none=True applied upstream).
-            actor:  Authenticated caller — used by FhirClient to stamp created_by.
+            actor:  Authenticated caller — forwarded as the Authorization header.
             accept: Content-type preference forwarded to the fhir-server.
 
         Returns:
             The newly created Patient dict with all sub-resources populated.
         """
-        return await self._fhir.post(f"{_PATH}/full", data, actor, accept=accept)
+        return await self._fhir.post(f"{_PATH}/full", data, actor, accept=accept, inject_audit=False)
 
     async def patch_full(self, patient_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """
@@ -88,35 +96,36 @@ class PatientClient:
           - Key present as [] → all records of that sub-resource type are deleted.
           - Key present as [{...}] → all records replaced with the provided items.
 
-        FhirClient.patch() stamps `updated_by: actor.sub` automatically.
+        inject_audit=False — see create()'s docstring.
 
         Args:
-            patient_id: The patient's integer primary key.
+            patient_id: The patient's public sequence ID.
             data:       Serialised PatientFullPatchSchema (exclude_none=True, mode="json" applied upstream).
-            actor:      Authenticated caller — used by FhirClient to stamp updated_by.
+            actor:      Authenticated caller — forwarded as the Authorization header.
             accept:     Content-type preference forwarded to the fhir-server.
 
         Returns:
             The updated Patient dict with all sub-resources populated.
         """
-        return await self._fhir.patch(f"{_PATH}/{patient_id}/full", data, actor, accept=accept)
+        return await self._fhir.patch(f"{_PATH}/{patient_id}/full", data, actor, accept=accept, inject_audit=False)
 
-    async def get_by_id(self, patient_id: int, accept: str | None = None) -> dict:
+    async def get_by_id(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """
-        GET /patients/{patient_id} — fetch a single Patient by integer ID.
+        GET /patients/{patient_id} — fetch a single Patient by its public sequence ID.
 
         The fhir-server populates all child arrays in the response automatically.
 
         Args:
-            patient_id: The patient's integer primary key on the fhir-server.
+            patient_id: The patient's public sequence ID on the fhir-server.
+            actor:      Authenticated caller — forwarded as the Authorization header.
             accept:     Content-type preference forwarded to the fhir-server.
 
         Returns:
             The Patient resource dict with all child arrays populated.
         """
-        return await self._fhir.get(f"{_PATH}/{patient_id}", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}", accept=accept, actor=actor)
 
-    async def get_core_by_id(self, patient_id: int, accept: str | None = None) -> dict:
+    async def get_core_by_id(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """
         GET /patients/{patient_id}/core — fetch only a Patient's own table data.
 
@@ -125,25 +134,32 @@ class PatientClient:
         selectinload fan-out that GET /patients/{patient_id} always pays for.
 
         Args:
-            patient_id: The patient's integer primary key on the fhir-server.
+            patient_id: The patient's public sequence ID on the fhir-server.
+            actor:      Authenticated caller — forwarded as the Authorization header.
             accept:     Content-type preference forwarded to the fhir-server.
 
         Returns:
             The Patient scalar-fields-only dict — no name/identifier/telecom/etc. keys.
         """
-        return await self._fhir.get(f"{_PATH}/{patient_id}/core", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/core", accept=accept, actor=actor)
 
-    async def list(self, accept: str | None = None, **params) -> dict:
+    async def list(self, actor: AuthUser, accept: str | None = None, **params) -> dict:
         """
         GET /patients — list Patients with optional filters.
 
         Strips None values from **params to avoid sending null query strings
         (e.g. `?name=None` would be rejected by the fhir-server).
 
-        Supported params: family_name, given_name, gender, active, user_id,
-        org_id, limit, offset.
+        Supported params: family, given, name, gender, active, user_id,
+        identifier, birthdate, death_date, deceased, address, address_city,
+        address_state, address_postal_code, address_country, address_use,
+        telecom, email, phone, language, general_practitioner, organization,
+        link, sort, total_mode, limit, offset. `org_id` is no longer a valid
+        filter — fhir-server always scopes Patient reads to the caller's own
+        org via the verified JWT.
 
         Args:
+            actor:    Authenticated caller — forwarded as the Authorization header.
             accept:   Content-type preference forwarded to the fhir-server.
             **params: Arbitrary keyword filters; None values are dropped.
 
@@ -151,35 +167,36 @@ class PatientClient:
             Paginated plain JSON or FHIR Bundle depending on `accept`.
         """
         clean = {k: v for k, v in params.items() if v is not None}
-        return await self._fhir.get(_PATH, params=clean, accept=accept)
+        return await self._fhir.get(_PATH, params=clean, accept=accept, actor=actor)
 
     async def patch(self, patient_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """
         PATCH /patients/{patient_id} — partially update a Patient.
 
-        FhirClient.patch() stamps `updated_by: actor.sub` automatically.
+        inject_audit=False — see create()'s docstring.
 
         Args:
-            patient_id: The patient's integer primary key.
+            patient_id: The patient's public sequence ID.
             data:       Serialised PatientPatchSchema fields to update.
-            actor:      Authenticated caller — used by FhirClient to stamp updated_by.
+            actor:      Authenticated caller — forwarded as the Authorization header.
             accept:     Content-type preference forwarded to the fhir-server.
 
         Returns:
             The updated Patient resource dict.
         """
-        return await self._fhir.patch(f"{_PATH}/{patient_id}", data, actor, accept=accept)
+        return await self._fhir.patch(f"{_PATH}/{patient_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete(self, patient_id: int) -> None:
+    async def delete(self, patient_id: int, actor: AuthUser) -> None:
         """
         DELETE /patients/{patient_id} — permanently remove a Patient and all child records.
 
         No `accept` parameter — 204 has no response body.
 
         Args:
-            patient_id: The patient's integer primary key to delete.
+            patient_id: The patient's public sequence ID to delete.
+            actor:      Authenticated caller — forwarded as the Authorization header.
         """
-        await self._fhir.delete(f"{_PATH}/{patient_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}", actor=actor)
 
     # ── Names ─────────────────────────────────────────────────────────────────
 
@@ -187,17 +204,17 @@ class PatientClient:
         """POST /patients/{patient_id}/names — add a HumanName to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/names", data, actor, accept=accept, inject_audit=False)
 
-    async def list_names(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_names(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/names — list all names for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/names", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/names", accept=accept, actor=actor)
 
     async def patch_name(self, patient_id: int, name_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/names/{name_id} — update a specific name."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/names/{name_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_name(self, patient_id: int, name_id: int) -> None:
+    async def delete_name(self, patient_id: int, name_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/names/{name_id} — remove a specific name."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/names/{name_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/names/{name_id}", actor=actor)
 
     # ── Identifiers ───────────────────────────────────────────────────────────
 
@@ -205,17 +222,17 @@ class PatientClient:
         """POST /patients/{patient_id}/identifiers — add an Identifier to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/identifiers", data, actor, accept=accept, inject_audit=False)
 
-    async def list_identifiers(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_identifiers(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/identifiers — list all identifiers for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/identifiers", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/identifiers", accept=accept, actor=actor)
 
     async def patch_identifier(self, patient_id: int, identifier_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/identifiers/{identifier_id} — update a specific identifier."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/identifiers/{identifier_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_identifier(self, patient_id: int, identifier_id: int) -> None:
+    async def delete_identifier(self, patient_id: int, identifier_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/identifiers/{identifier_id} — remove a specific identifier."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/identifiers/{identifier_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/identifiers/{identifier_id}", actor=actor)
 
     # ── Telecom ───────────────────────────────────────────────────────────────
 
@@ -223,17 +240,17 @@ class PatientClient:
         """POST /patients/{patient_id}/telecom — add a ContactPoint to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/telecom", data, actor, accept=accept, inject_audit=False)
 
-    async def list_telecom(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_telecom(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/telecom — list all telecom entries for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/telecom", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/telecom", accept=accept, actor=actor)
 
     async def patch_telecom(self, patient_id: int, telecom_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/telecom/{telecom_id} — update a specific telecom entry."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/telecom/{telecom_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_telecom(self, patient_id: int, telecom_id: int) -> None:
+    async def delete_telecom(self, patient_id: int, telecom_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/telecom/{telecom_id} — remove a specific telecom entry."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/telecom/{telecom_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/telecom/{telecom_id}", actor=actor)
 
     # ── Addresses ─────────────────────────────────────────────────────────────
 
@@ -241,17 +258,17 @@ class PatientClient:
         """POST /patients/{patient_id}/addresses — add an Address to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/addresses", data, actor, accept=accept, inject_audit=False)
 
-    async def list_addresses(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_addresses(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/addresses — list all addresses for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/addresses", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/addresses", accept=accept, actor=actor)
 
     async def patch_address(self, patient_id: int, address_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/addresses/{address_id} — update a specific address."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/addresses/{address_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_address(self, patient_id: int, address_id: int) -> None:
+    async def delete_address(self, patient_id: int, address_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/addresses/{address_id} — remove a specific address."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/addresses/{address_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/addresses/{address_id}", actor=actor)
 
     # ── Photos ────────────────────────────────────────────────────────────────
 
@@ -259,17 +276,17 @@ class PatientClient:
         """POST /patients/{patient_id}/photos — add an Attachment (photo) to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/photos", data, actor, accept=accept, inject_audit=False)
 
-    async def list_photos(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_photos(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/photos — list all photos for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/photos", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/photos", accept=accept, actor=actor)
 
     async def patch_photo(self, patient_id: int, photo_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/photos/{photo_id} — update a specific photo."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/photos/{photo_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_photo(self, patient_id: int, photo_id: int) -> None:
+    async def delete_photo(self, patient_id: int, photo_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/photos/{photo_id} — remove a specific photo."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/photos/{photo_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/photos/{photo_id}", actor=actor)
 
     # ── Contacts ──────────────────────────────────────────────────────────────
 
@@ -277,17 +294,17 @@ class PatientClient:
         """POST /patients/{patient_id}/contacts — add a contact (next-of-kin/guardian) to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/contacts", data, actor, accept=accept, inject_audit=False)
 
-    async def list_contacts(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_contacts(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/contacts — list all contacts for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/contacts", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/contacts", accept=accept, actor=actor)
 
     async def patch_contact(self, patient_id: int, contact_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/contacts/{contact_id} — update a specific contact."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/contacts/{contact_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_contact(self, patient_id: int, contact_id: int) -> None:
+    async def delete_contact(self, patient_id: int, contact_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/contacts/{contact_id} — remove a specific contact and its child records."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/contacts/{contact_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/contacts/{contact_id}", actor=actor)
 
     # ── Communications ────────────────────────────────────────────────────────
 
@@ -295,17 +312,17 @@ class PatientClient:
         """POST /patients/{patient_id}/communications — add a language/communication preference to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/communications", data, actor, accept=accept, inject_audit=False)
 
-    async def list_communications(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_communications(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/communications — list all communication entries for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/communications", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/communications", accept=accept, actor=actor)
 
     async def patch_communication(self, patient_id: int, comm_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/communications/{comm_id} — update a specific communication entry."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/communications/{comm_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_communication(self, patient_id: int, comm_id: int) -> None:
+    async def delete_communication(self, patient_id: int, comm_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/communications/{comm_id} — remove a specific communication entry."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/communications/{comm_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/communications/{comm_id}", actor=actor)
 
     # ── General Practitioners ─────────────────────────────────────────────────
 
@@ -313,17 +330,17 @@ class PatientClient:
         """POST /patients/{patient_id}/general-practitioners — add a GP reference to a Patient."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/general-practitioners", data, actor, accept=accept, inject_audit=False)
 
-    async def list_general_practitioners(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_general_practitioners(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/general-practitioners — list all GP references for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/general-practitioners", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/general-practitioners", accept=accept, actor=actor)
 
     async def patch_general_practitioner(self, patient_id: int, gp_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/general-practitioners/{gp_id} — update a specific GP reference."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/general-practitioners/{gp_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_general_practitioner(self, patient_id: int, gp_id: int) -> None:
+    async def delete_general_practitioner(self, patient_id: int, gp_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/general-practitioners/{gp_id} — remove a specific GP reference."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/general-practitioners/{gp_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/general-practitioners/{gp_id}", actor=actor)
 
     # ── Links ─────────────────────────────────────────────────────────────────
 
@@ -331,14 +348,14 @@ class PatientClient:
         """POST /patients/{patient_id}/links — add a link to a related Patient or RelatedPerson."""
         return await self._fhir.post(f"{_PATH}/{patient_id}/links", data, actor, accept=accept, inject_audit=False)
 
-    async def list_links(self, patient_id: int, accept: str | None = None) -> dict:
+    async def list_links(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """GET /patients/{patient_id}/links — list all links for a Patient."""
-        return await self._fhir.get(f"{_PATH}/{patient_id}/links", accept=accept)
+        return await self._fhir.get(f"{_PATH}/{patient_id}/links", accept=accept, actor=actor)
 
     async def patch_link(self, patient_id: int, link_id: int, data: dict, actor: AuthUser, accept: str | None = None) -> dict:
         """PATCH /patients/{patient_id}/links/{link_id} — update a specific link."""
         return await self._fhir.patch(f"{_PATH}/{patient_id}/links/{link_id}", data, actor, accept=accept, inject_audit=False)
 
-    async def delete_link(self, patient_id: int, link_id: int) -> None:
+    async def delete_link(self, patient_id: int, link_id: int, actor: AuthUser) -> None:
         """DELETE /patients/{patient_id}/links/{link_id} — remove a specific link."""
-        await self._fhir.delete(f"{_PATH}/{patient_id}/links/{link_id}")
+        await self._fhir.delete(f"{_PATH}/{patient_id}/links/{link_id}", actor=actor)

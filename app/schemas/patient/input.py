@@ -15,7 +15,7 @@ Reference: https://hl7.org/fhir/R4/patient.html
 from datetime import date, datetime
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.enums import (
     AddressType,
@@ -40,13 +40,18 @@ class PatientCreateSchema(BaseModel):
     """
     Input schema for creating a Patient resource.
 
-    user_id and org_id are required — the fhir-server uses them to scope
-    the patient to the correct tenant. created_by is NOT included here;
-    FhirClient.post() injects it from actor.sub automatically.
+    user_id is required — the fhir-server uses it to link the patient to the
+    owning portal user. org_id is NOT included here: unlike every other
+    resource, fhir-server derives Patient's org_id from the verified JWT's
+    `activeOrganizationId` claim itself (see fhir-server's Multi-Tenancy &
+    Ownership rollout status) — a client-supplied org_id would now be
+    rejected outright (extra="forbid", no such field declared). created_by
+    is likewise NOT included here; fhir-server stamps it from the verified
+    JWT's `sub` claim, not from FhirClient's usual actor.sub injection.
 
     All FHIR scalar fields (gender, birth_date, deceased_*, marital_status_*,
     multiple_birth_*, managing_organization) are optional — the fhir-server
-    allows creating a minimal patient with only tenant fields.
+    allows creating a minimal patient with only user_id.
     """
 
     model_config = ConfigDict(
@@ -54,7 +59,6 @@ class PatientCreateSchema(BaseModel):
         json_schema_extra={
             "example": {
                 "user_id": "u-abc123",
-                "org_id": "org-xyz456",
                 "active": True,
                 "gender": "female",
                 "birth_date": "1990-06-15",
@@ -62,9 +66,10 @@ class PatientCreateSchema(BaseModel):
         },
     )
 
-    # Tenant scoping — required for multi-tenant data isolation on the fhir-server.
+    # Owning-user scoping — required so the fhir-server can link this Patient
+    # to a portal user. org_id is deliberately absent: fhir-server derives it
+    # from the caller's verified JWT instead (Patient-only exception).
     user_id: str = Field(description="JWT subject of the owning user.")
-    org_id: str = Field(description="Tenant organisation identifier.")
 
     # FHIR Patient scalar fields — all optional per the R4 spec.
     active: Optional[bool] = Field(True, description="Whether this patient record is active.")
@@ -77,9 +82,11 @@ class PatientCreateSchema(BaseModel):
 
     # maritalStatus — flattened CodeableConcept.
     marital_status_system: Optional[str] = Field(None, description="Coding system URI for marital status.")
+    marital_status_version: Optional[str] = Field(None, description="Version of the marital-status coding system.")
     marital_status_code: Optional[str] = Field(None, description="Marital status code (e.g. M, S, D, W).")
     marital_status_display: Optional[str] = Field(None, description="Human-readable marital status label.")
     marital_status_text: Optional[str] = Field(None, description="Plain-text marital status description.")
+    marital_status_user_selected: Optional[bool] = Field(None, description="Whether this marital-status coding was chosen directly by the user.")
 
     # multipleBirth[x] — only one of these should be set at a time.
     multiple_birth_boolean: Optional[bool] = Field(None, description="True if the patient is part of a multiple birth.")
@@ -89,14 +96,30 @@ class PatientCreateSchema(BaseModel):
     managing_organization: Optional[str] = Field(None, description="FHIR reference to managing org e.g. 'Organization/190001'.")
     managing_organization_display: Optional[str] = Field(None, description="Display name of the managing organisation.")
 
+    # managingOrganization.identifier — logical-reference fallback for when the
+    # managing organisation isn't a resource in this system at all (matches
+    # FHIR's Reference.identifier).
+    managing_organization_identifier_use: Optional[IdentifierUse] = Field(None, description="Fallback identifier use: usual | official | temp | secondary | old.")
+    managing_organization_identifier_type_system: Optional[str] = Field(None, description="Fallback identifier — coding system for its type.")
+    managing_organization_identifier_type_version: Optional[str] = Field(None, description="Fallback identifier — version of the type coding system.")
+    managing_organization_identifier_type_code: Optional[str] = Field(None, description="Fallback identifier — code for its type (e.g. MR, SS).")
+    managing_organization_identifier_type_display: Optional[str] = Field(None, description="Fallback identifier — display for its type.")
+    managing_organization_identifier_type_text: Optional[str] = Field(None, description="Fallback identifier — plain-text rendering of its type.")
+    managing_organization_identifier_type_user_selected: Optional[bool] = Field(None, description="Fallback identifier — whether its type coding was user-selected.")
+    managing_organization_identifier_system: Optional[str] = Field(None, description="Fallback identifier — URI namespace.")
+    managing_organization_identifier_value: Optional[str] = Field(None, description="Fallback identifier — value within the given system.")
+    managing_organization_identifier_period_start: Optional[datetime] = Field(None, description="Fallback identifier — when it became valid.")
+    managing_organization_identifier_period_end: Optional[datetime] = Field(None, description="Fallback identifier — when it stopped being valid.")
+
 
 class PatientPatchSchema(BaseModel):
     """
     Patchable fields for a Patient resource.
 
     All fields are optional — at least one must be provided (enforced in the
-    service layer). user_id, org_id, and created_by are not patchable —
-    they are fixed at creation time or injected automatically.
+    service layer). user_id is not patchable (fixed at creation time); org_id
+    and updated_by are never client-suppliable at all — fhir-server derives
+    both from the verified JWT.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -107,57 +130,107 @@ class PatientPatchSchema(BaseModel):
     deceased_boolean: Optional[bool] = None
     deceased_datetime: Optional[datetime] = None
     marital_status_system: Optional[str] = None
+    marital_status_version: Optional[str] = None
     marital_status_code: Optional[str] = None
     marital_status_display: Optional[str] = None
     marital_status_text: Optional[str] = None
+    marital_status_user_selected: Optional[bool] = None
     multiple_birth_boolean: Optional[bool] = None
     multiple_birth_integer: Optional[int] = None
     managing_organization: Optional[str] = None
     managing_organization_display: Optional[str] = None
+    managing_organization_identifier_use: Optional[IdentifierUse] = None
+    managing_organization_identifier_type_system: Optional[str] = None
+    managing_organization_identifier_type_version: Optional[str] = None
+    managing_organization_identifier_type_code: Optional[str] = None
+    managing_organization_identifier_type_display: Optional[str] = None
+    managing_organization_identifier_type_text: Optional[str] = None
+    managing_organization_identifier_type_user_selected: Optional[bool] = None
+    managing_organization_identifier_system: Optional[str] = None
+    managing_organization_identifier_value: Optional[str] = None
+    managing_organization_identifier_period_start: Optional[datetime] = None
+    managing_organization_identifier_period_end: Optional[datetime] = None
 
 
 class ListPatientsSchema(BaseModel):
     """
     Query parameters for the GET /patients list endpoint.
 
-    All filters are optional and combinable. family_name and given_name perform
-    case-insensitive partial matches against the patient_name child table on
-    the fhir-server. user_id and org_id are provided explicitly by admin
-    callers who need cross-tenant queries; regular callers should use /me.
+    All filters are optional and combinable. Mirrors fhir-server's current
+    `list_patients` filter set exactly (app/routers/patient.py there) — see
+    dev-docs/12-search-and-filter-standards.md for the design rationale.
+    This schema declares the contract; PatientService.list() translates each
+    field into the exact (possibly hyphenated) query-string key fhir-server
+    expects, and PatientClient.list() forwards them untouched.
 
-    The filters below (identifier through organization_id) and sort/total_mode
-    mirror the advanced filter set added to the fhir-server's own
-    PatientRepository.list() — see that project's dev-docs/12-search-and-filter-
-    standards.md for the full target contract this schema forwards untouched
-    to the fhir-server (this schema declares the contract; PatientClient.list()
-    forwards whatever's set here as plain query params — see that module).
+    org_id is deliberately NOT a filter here (removed — previously existed):
+    fhir-server always scopes Patient reads to the caller's own org via the
+    verified JWT's activeOrganizationId claim; a client can never widen or
+    redirect that scope. user_id remains — it can only narrow the results to
+    a single user within the caller's own org, never escape it.
+
+    populate_by_name=True lets callers construct this model with either the
+    Python attribute name (e.g. GraphQL's queries.py) or the FHIR-style alias
+    (e.g. FastAPI parsing `?address-city=...` from the REST querystring).
     """
 
-    family_name: Optional[str] = Field(None, description="Partial, case-insensitive match on family name.")
-    given_name: Optional[str] = Field(None, description="Partial, case-insensitive match on given name.")
-    gender: Optional[AdministrativeGender] = Field(None, description="Exact match on administrative gender.")
+    model_config = ConfigDict(populate_by_name=True)
+
+    family: Optional[str] = Field(None, description="Filter by family (last) name — partial match.")
+    given: Optional[str] = Field(None, description="Filter by given name — partial match.")
+    name: Optional[str] = Field(
+        None,
+        description="Partial match against any HumanName sub-field (family, given, prefix, suffix, text).",
+    )
+    gender: Optional[AdministrativeGender] = Field(None, description="male|female|other|unknown")
     active: Optional[bool] = Field(None, description="Filter by active status.")
     user_id: Optional[str] = Field(None, description="Filter by owning user (JWT subject).")
-    org_id: Optional[str] = Field(None, description="Filter by tenant organisation ID.")
-
     identifier: Optional[str] = Field(None, description="Exact match on a business identifier value (MRN, SSN, etc.).")
-    birth_date_from: Optional[date] = Field(None, description="Inclusive lower bound on birth date.")
-    birth_date_to: Optional[date] = Field(None, description="Inclusive upper bound on birth date.")
-    address_city: Optional[str] = Field(None, description="Partial, case-insensitive match on address city.")
-    address_state: Optional[str] = Field(None, description="Partial, case-insensitive match on address state.")
-    address_postal_code: Optional[str] = Field(None, description="Exact match on address postal code.")
-    email: Optional[str] = Field(None, description="Partial match on telecom value where system=email.")
-    phone: Optional[str] = Field(None, description="Partial match on telecom value where system=phone.")
-    deceased: Optional[bool] = Field(None, description="Filter by deceased status (deceasedBoolean).")
-    general_practitioner_type: Optional[GeneralPractitionerReferenceType] = Field(
-        None, description="Reference type for generalPractitioner — narrows general_practitioner_id."
-    )
-    general_practitioner_id: Optional[int] = Field(
-        None, description="Public id of a referenced Organization/Practitioner/PractitionerRole."
-    )
-    organization_id: Optional[int] = Field(None, description="Public id of the managingOrganization.")
 
-    sort: Optional[str] = Field(None, description="Field to sort by; prefix with '-' for descending (e.g. '-birth_date').")
+    birthdate: Optional[List[str]] = Field(
+        None,
+        description=(
+            "FHIR comparator-prefixed date (eq/ne/gt/lt/ge/le), e.g. `ge2020-01-01`. "
+            "Repeat the param for a range, e.g. birthdate=ge2020-01-01&birthdate=le2020-12-31."
+        ),
+    )
+    death_date: Optional[List[str]] = Field(
+        None,
+        alias="death-date",
+        description="Same comparator-prefixed format as birthdate, filtering on the deceased dateTime.",
+    )
+    deceased: Optional[bool] = Field(
+        None, description="true = deceased[x] is populated at all (boolean true or a death date present)."
+    )
+
+    address: Optional[str] = Field(
+        None,
+        description="Partial match against any Address sub-field (line, city, district, state, country, postalCode, text).",
+    )
+    address_city: Optional[str] = Field(None, alias="address-city", description="Filter by address city — partial match.")
+    address_state: Optional[str] = Field(None, alias="address-state", description="Filter by address state — partial match.")
+    address_postal_code: Optional[str] = Field(
+        None, alias="address-postalcode", description="Filter by address postal code — exact match."
+    )
+    address_country: Optional[str] = Field(None, alias="address-country", description="Filter by address country — partial match.")
+    address_use: Optional[AddressUse] = Field(None, alias="address-use", description="home|work|temp|old|billing.")
+
+    telecom: Optional[str] = Field(None, description="Filter by any telecom value, regardless of system — partial match.")
+    email: Optional[str] = Field(None, description="Filter by telecom email — partial match, system=email only.")
+    phone: Optional[str] = Field(None, description="Filter by telecom phone — partial match, system=phone only.")
+    language: Optional[str] = Field(None, description="Exact match on Patient.communication.language code (e.g. en, fr).")
+
+    general_practitioner: Optional[str] = Field(
+        None,
+        alias="general-practitioner",
+        description="generalPractitioner as a FHIR reference string, e.g. `Practitioner/30001`.",
+    )
+    organization: Optional[str] = Field(
+        None, description="managingOrganization as a FHIR reference string, e.g. `Organization/190001`."
+    )
+    link: Optional[str] = Field(None, description="FHIR reference string, e.g. `Patient/10002` or `RelatedPerson/300001`.")
+
+    sort: Optional[str] = Field(None, description="Field to sort by; prefix with '-' for descending (e.g. '-birthdate').")
     total_mode: Literal["accurate", "none"] = Field(
         "accurate",
         description="'none' skips the total-count query — use on large result sets when only the page is needed.",
@@ -221,14 +294,35 @@ class IdentifierCreateSchema(BaseModel):
 
     use: Optional[IdentifierUse] = Field(None, description="usual | official | temp | secondary | old")
     type_system: Optional[str] = Field(None, description="Coding system URI for the identifier type.")
+    type_version: Optional[str] = Field(None, description="Version of the identifier-type coding system.")
     type_code: Optional[str] = Field(None, description="Type code (e.g. MR for medical record number).")
     type_display: Optional[str] = Field(None, description="Human-readable label for the type code.")
     type_text: Optional[str] = Field(None, description="Plain-text description of the identifier type.")
+    type_user_selected: Optional[bool] = Field(None, description="Whether this identifier-type coding was chosen directly by the user.")
     system: Optional[str] = Field(None, description="URI of the identifier namespace.")
     value: str = Field(..., description="The identifier value within the namespace.")
     period_start: Optional[datetime] = Field(None, description="Start of the period this identifier is valid.")
     period_end: Optional[datetime] = Field(None, description="End of the period this identifier is valid.")
-    assigner: Optional[str] = Field(None, description="Display name of the organisation that issued the identifier.")
+
+    # assigner — Reference(Organization) that issued the identifier. `assigner`
+    # is now a FHIR reference string (e.g. 'Organization/190001'), not a
+    # display name — use assigner_display for the human-readable label.
+    assigner: Optional[str] = Field(None, description="FHIR reference to the assigning organisation e.g. 'Organization/190001'.")
+    assigner_display: Optional[str] = Field(None, description="Display name of the assigning organisation.")
+
+    # assigner.identifier — logical-reference fallback for when the assigning
+    # organisation isn't a resource in this system at all.
+    assigner_identifier_use: Optional[IdentifierUse] = Field(None, description="Fallback identifier use: usual | official | temp | secondary | old.")
+    assigner_identifier_type_system: Optional[str] = Field(None, description="Fallback identifier — coding system for its type.")
+    assigner_identifier_type_version: Optional[str] = Field(None, description="Fallback identifier — version of the type coding system.")
+    assigner_identifier_type_code: Optional[str] = Field(None, description="Fallback identifier — code for its type (e.g. MR, SS).")
+    assigner_identifier_type_display: Optional[str] = Field(None, description="Fallback identifier — display for its type.")
+    assigner_identifier_type_text: Optional[str] = Field(None, description="Fallback identifier — plain-text rendering of its type.")
+    assigner_identifier_type_user_selected: Optional[bool] = Field(None, description="Fallback identifier — whether its type coding was user-selected.")
+    assigner_identifier_system: Optional[str] = Field(None, description="Fallback identifier — URI namespace.")
+    assigner_identifier_value: Optional[str] = Field(None, description="Fallback identifier — value within the given system.")
+    assigner_identifier_period_start: Optional[datetime] = Field(None, description="Fallback identifier — when it became valid.")
+    assigner_identifier_period_end: Optional[datetime] = Field(None, description="Fallback identifier — when it stopped being valid.")
 
 
 class IdentifierPatchSchema(BaseModel):
@@ -238,14 +332,28 @@ class IdentifierPatchSchema(BaseModel):
 
     use: Optional[IdentifierUse] = None
     type_system: Optional[str] = None
+    type_version: Optional[str] = None
     type_code: Optional[str] = None
     type_display: Optional[str] = None
     type_text: Optional[str] = None
+    type_user_selected: Optional[bool] = None
     system: Optional[str] = None
     value: Optional[str] = None
     period_start: Optional[datetime] = None
     period_end: Optional[datetime] = None
     assigner: Optional[str] = None
+    assigner_display: Optional[str] = None
+    assigner_identifier_use: Optional[IdentifierUse] = None
+    assigner_identifier_type_system: Optional[str] = None
+    assigner_identifier_type_version: Optional[str] = None
+    assigner_identifier_type_code: Optional[str] = None
+    assigner_identifier_type_display: Optional[str] = None
+    assigner_identifier_type_text: Optional[str] = None
+    assigner_identifier_type_user_selected: Optional[bool] = None
+    assigner_identifier_system: Optional[str] = None
+    assigner_identifier_value: Optional[str] = None
+    assigner_identifier_period_start: Optional[datetime] = None
+    assigner_identifier_period_end: Optional[datetime] = None
 
 
 # ── Sub-resource: Telecom ─────────────────────────────────────────────────────
@@ -379,9 +487,11 @@ class ContactRelationshipInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     coding_system: Optional[str] = Field(None, description="Coding system URI (e.g. http://terminology.hl7.org/CodeSystem/v2-0131).")
+    coding_version: Optional[str] = Field(None, description="Version of the relationship coding system.")
     coding_code: Optional[str] = Field(None, description="Relationship code (e.g. C for emergency contact, N for next-of-kin).")
     coding_display: Optional[str] = Field(None, description="Human-readable label for the relationship code.")
     text: Optional[str] = Field(None, description="Plain-text description of the relationship.")
+    coding_user_selected: Optional[bool] = Field(None, description="Whether this coding was chosen directly by the user.")
 
 
 class ContactTelecomInput(BaseModel):
@@ -419,6 +529,8 @@ class ContactCreateSchema(BaseModel):
     name_given: Optional[List[str]] = None
     name_prefix: Optional[List[str]] = None
     name_suffix: Optional[List[str]] = None
+    name_period_start: Optional[datetime] = Field(None, description="When the contact person's name became valid.")
+    name_period_end: Optional[datetime] = Field(None, description="When the contact person's name stopped being valid.")
 
     # ContactPoint array (0..*).
     telecom: Optional[List[ContactTelecomInput]] = None
@@ -439,6 +551,21 @@ class ContactCreateSchema(BaseModel):
     gender: Optional[AdministrativeGender] = Field(None, description="Administrative gender of the contact person.")
     organization: Optional[str] = Field(None, description="FHIR reference to the contact's organisation e.g. 'Organization/190001'.")
     organization_display: Optional[str] = None
+
+    # organization.identifier — logical-reference fallback for when the
+    # contact's organisation isn't a resource in this system at all.
+    organization_identifier_use: Optional[IdentifierUse] = Field(None, description="Fallback identifier use: usual | official | temp | secondary | old.")
+    organization_identifier_type_system: Optional[str] = Field(None, description="Fallback identifier — coding system for its type.")
+    organization_identifier_type_version: Optional[str] = Field(None, description="Fallback identifier — version of the type coding system.")
+    organization_identifier_type_code: Optional[str] = Field(None, description="Fallback identifier — code for its type (e.g. MR, SS).")
+    organization_identifier_type_display: Optional[str] = Field(None, description="Fallback identifier — display for its type.")
+    organization_identifier_type_text: Optional[str] = Field(None, description="Fallback identifier — plain-text rendering of its type.")
+    organization_identifier_type_user_selected: Optional[bool] = Field(None, description="Fallback identifier — whether its type coding was user-selected.")
+    organization_identifier_system: Optional[str] = Field(None, description="Fallback identifier — URI namespace.")
+    organization_identifier_value: Optional[str] = Field(None, description="Fallback identifier — value within the given system.")
+    organization_identifier_period_start: Optional[datetime] = Field(None, description="Fallback identifier — when it became valid.")
+    organization_identifier_period_end: Optional[datetime] = Field(None, description="Fallback identifier — when it stopped being valid.")
+
     period_start: Optional[datetime] = Field(None, description="Start of the period this contact is/was applicable.")
     period_end: Optional[datetime] = None
 
@@ -460,6 +587,8 @@ class ContactPatchSchema(BaseModel):
     name_given: Optional[List[str]] = None
     name_prefix: Optional[List[str]] = None
     name_suffix: Optional[List[str]] = None
+    name_period_start: Optional[datetime] = None
+    name_period_end: Optional[datetime] = None
     telecom: Optional[List[ContactTelecomInput]] = None
     address_use: Optional[AddressUse] = None
     address_type: Optional[AddressType] = None
@@ -475,6 +604,17 @@ class ContactPatchSchema(BaseModel):
     gender: Optional[AdministrativeGender] = None
     organization: Optional[str] = None
     organization_display: Optional[str] = None
+    organization_identifier_use: Optional[IdentifierUse] = None
+    organization_identifier_type_system: Optional[str] = None
+    organization_identifier_type_version: Optional[str] = None
+    organization_identifier_type_code: Optional[str] = None
+    organization_identifier_type_display: Optional[str] = None
+    organization_identifier_type_text: Optional[str] = None
+    organization_identifier_type_user_selected: Optional[bool] = None
+    organization_identifier_system: Optional[str] = None
+    organization_identifier_value: Optional[str] = None
+    organization_identifier_period_start: Optional[datetime] = None
+    organization_identifier_period_end: Optional[datetime] = None
     period_start: Optional[datetime] = None
     period_end: Optional[datetime] = None
 
@@ -493,9 +633,11 @@ class CommunicationCreateSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     language_system: Optional[str] = Field(None, description="Coding system URI for the language (e.g. urn:ietf:bcp:47).")
+    language_version: Optional[str] = Field(None, description="Version of the language coding system.")
     language_code: str = Field(..., description="ISO 639-1 language code (e.g. en, fr, de).")
     language_display: Optional[str] = Field(None, description="Human-readable language name.")
     language_text: Optional[str] = Field(None, description="Plain-text description of the language preference.")
+    language_user_selected: Optional[bool] = Field(None, description="Whether this coding was chosen directly by the user.")
     preferred: Optional[bool] = Field(None, description="True if this is the patient's preferred language.")
 
 
@@ -505,9 +647,11 @@ class CommunicationPatchSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     language_system: Optional[str] = None
+    language_version: Optional[str] = None
     language_code: Optional[str] = None
     language_display: Optional[str] = None
     language_text: Optional[str] = None
+    language_user_selected: Optional[bool] = None
     preferred: Optional[bool] = None
 
 
@@ -518,16 +662,42 @@ class GeneralPractitionerCreateSchema(BaseModel):
     """
     Input for adding a generalPractitioner reference to a Patient.
 
-    `reference_type` must be one of Organization, Practitioner, or PractitionerRole —
-    these are the only resource types FHIR R4 allows for Patient.generalPractitioner.
-    `reference_id` is the integer primary key of the referenced resource on the fhir-server.
+    `reference_type`/`reference_id` are now optional — the fhir-server also
+    accepts a logical-reference fallback (`reference_identifier_system` +
+    `reference_identifier_value`) for a GP who isn't a resource in this
+    system at all (e.g. an external provider known only by NPI). At least
+    one of the two forms must be supplied (enforced below).
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    reference_type: GeneralPractitionerReferenceType = Field(..., description="Organization | Practitioner | PractitionerRole")
-    reference_id: int = Field(..., description="Integer ID of the referenced resource on the fhir-server.")
+    reference_type: Optional[GeneralPractitionerReferenceType] = Field(None, description="Organization | Practitioner | PractitionerRole. Required together with reference_id unless the identifier fallback is used instead.")
+    reference_id: Optional[int] = Field(None, description="Integer ID of the referenced resource on the fhir-server.")
     reference_display: Optional[str] = Field(None, description="Human-readable display name for the reference.")
+
+    # Logical-reference fallback — used when the GP isn't a resource in this system.
+    reference_identifier_use: Optional[IdentifierUse] = Field(None, description="Fallback identifier use: usual | official | temp | secondary | old.")
+    reference_identifier_type_system: Optional[str] = Field(None, description="Fallback identifier — coding system for its type.")
+    reference_identifier_type_version: Optional[str] = Field(None, description="Fallback identifier — version of the type coding system.")
+    reference_identifier_type_code: Optional[str] = Field(None, description="Fallback identifier — code for its type (e.g. MR, SS).")
+    reference_identifier_type_display: Optional[str] = Field(None, description="Fallback identifier — display for its type.")
+    reference_identifier_type_text: Optional[str] = Field(None, description="Fallback identifier — plain-text rendering of its type.")
+    reference_identifier_type_user_selected: Optional[bool] = Field(None, description="Fallback identifier — whether its type coding was user-selected.")
+    reference_identifier_system: Optional[str] = Field(None, description="Fallback identifier — URI namespace.")
+    reference_identifier_value: Optional[str] = Field(None, description="Fallback identifier — value within the given system.")
+    reference_identifier_period_start: Optional[datetime] = Field(None, description="Fallback identifier — when it became valid.")
+    reference_identifier_period_end: Optional[datetime] = Field(None, description="Fallback identifier — when it stopped being valid.")
+
+    @model_validator(mode="after")
+    def _require_reference_or_identifier(self):
+        has_reference = self.reference_type is not None and self.reference_id is not None
+        has_identifier = self.reference_identifier_system is not None and self.reference_identifier_value is not None
+        if not has_reference and not has_identifier:
+            raise ValueError(
+                "Provide either reference_type+reference_id or "
+                "reference_identifier_system+reference_identifier_value."
+            )
+        return self
 
 
 class GeneralPractitionerPatchSchema(BaseModel):
@@ -538,6 +708,17 @@ class GeneralPractitionerPatchSchema(BaseModel):
     reference_type: Optional[GeneralPractitionerReferenceType] = None
     reference_id: Optional[int] = None
     reference_display: Optional[str] = None
+    reference_identifier_use: Optional[IdentifierUse] = None
+    reference_identifier_type_system: Optional[str] = None
+    reference_identifier_type_version: Optional[str] = None
+    reference_identifier_type_code: Optional[str] = None
+    reference_identifier_type_display: Optional[str] = None
+    reference_identifier_type_text: Optional[str] = None
+    reference_identifier_type_user_selected: Optional[bool] = None
+    reference_identifier_system: Optional[str] = None
+    reference_identifier_value: Optional[str] = None
+    reference_identifier_period_start: Optional[datetime] = None
+    reference_identifier_period_end: Optional[datetime] = None
 
 
 # ── Sub-resource: Links ───────────────────────────────────────────────────────
@@ -547,17 +728,44 @@ class LinkCreateSchema(BaseModel):
     """
     Input for adding a link between this Patient and another Patient or RelatedPerson.
 
-    All three fields are required — a link must specify what it points to and
-    what the relationship is. `type` describes the semantic relationship
-    (e.g. replaced-by, replaces, refer, seealso).
+    `other_type`/`other_id` are now optional — the fhir-server also accepts a
+    logical-reference fallback (`other_identifier_system` + `other_identifier_value`)
+    for linking to a record that isn't a resource in this system at all (e.g.
+    a duplicate record in an external EMR). At least one of the two forms
+    must be supplied (enforced below). `type` is still always required.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    other_type: PatientLinkOtherType = Field(..., description="Patient | RelatedPerson")
-    other_id: int = Field(..., description="Integer ID of the linked Patient or RelatedPerson.")
+    other_type: Optional[PatientLinkOtherType] = Field(None, description="Patient | RelatedPerson. Required together with other_id unless the identifier fallback is used instead.")
+    other_id: Optional[int] = Field(None, description="Integer ID of the linked Patient or RelatedPerson.")
     other_display: Optional[str] = Field(None, description="Display name for the linked resource.")
+
+    # Logical-reference fallback — used when the linked record isn't a resource in this system.
+    other_identifier_use: Optional[IdentifierUse] = Field(None, description="Fallback identifier use: usual | official | temp | secondary | old.")
+    other_identifier_type_system: Optional[str] = Field(None, description="Fallback identifier — coding system for its type.")
+    other_identifier_type_version: Optional[str] = Field(None, description="Fallback identifier — version of the type coding system.")
+    other_identifier_type_code: Optional[str] = Field(None, description="Fallback identifier — code for its type (e.g. MR, SS).")
+    other_identifier_type_display: Optional[str] = Field(None, description="Fallback identifier — display for its type.")
+    other_identifier_type_text: Optional[str] = Field(None, description="Fallback identifier — plain-text rendering of its type.")
+    other_identifier_type_user_selected: Optional[bool] = Field(None, description="Fallback identifier — whether its type coding was user-selected.")
+    other_identifier_system: Optional[str] = Field(None, description="Fallback identifier — URI namespace.")
+    other_identifier_value: Optional[str] = Field(None, description="Fallback identifier — value within the given system.")
+    other_identifier_period_start: Optional[datetime] = Field(None, description="Fallback identifier — when it became valid.")
+    other_identifier_period_end: Optional[datetime] = Field(None, description="Fallback identifier — when it stopped being valid.")
+
     type: PatientLinkType = Field(..., description="replaced-by | replaces | refer | seealso")
+
+    @model_validator(mode="after")
+    def _require_reference_or_identifier(self):
+        has_reference = self.other_type is not None and self.other_id is not None
+        has_identifier = self.other_identifier_system is not None and self.other_identifier_value is not None
+        if not has_reference and not has_identifier:
+            raise ValueError(
+                "Provide either other_type+other_id or "
+                "other_identifier_system+other_identifier_value."
+            )
+        return self
 
 
 class LinkPatchSchema(BaseModel):
@@ -568,6 +776,17 @@ class LinkPatchSchema(BaseModel):
     other_type: Optional[PatientLinkOtherType] = None
     other_id: Optional[int] = None
     other_display: Optional[str] = None
+    other_identifier_use: Optional[IdentifierUse] = None
+    other_identifier_type_system: Optional[str] = None
+    other_identifier_type_version: Optional[str] = None
+    other_identifier_type_code: Optional[str] = None
+    other_identifier_type_display: Optional[str] = None
+    other_identifier_type_text: Optional[str] = None
+    other_identifier_type_user_selected: Optional[bool] = None
+    other_identifier_system: Optional[str] = None
+    other_identifier_value: Optional[str] = None
+    other_identifier_period_start: Optional[datetime] = None
+    other_identifier_period_end: Optional[datetime] = None
     type: Optional[PatientLinkType] = None
 
 
@@ -628,7 +847,6 @@ class PatientFullCreateSchema(PatientCreateSchema):
         json_schema_extra={
             "example": {
                 "user_id": "u-abc123",
-                "org_id": "org-xyz456",
                 "active": True,
                 "gender": "female",
                 "birth_date": "1990-06-15",

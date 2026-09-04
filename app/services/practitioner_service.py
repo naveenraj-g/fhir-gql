@@ -91,7 +91,7 @@ class PractitionerService:
         await validate_reference(
             issuer,
             resource_type="Organization",
-            get_by_id=self._org_client.get_by_id,
+            get_by_id=lambda org_id: self._org_client.get_by_id(org_id, actor),
             actor=actor,
             field_name="issuer",
         )
@@ -147,17 +147,17 @@ class PractitionerService:
 
     async def get_by_id(self, resource_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """Fetch a single Practitioner by integer primary key, with all sub-resource arrays."""
-        return await self._client.get_by_id(resource_id, accept=accept)
+        return await self._client.get_by_id(resource_id, actor, accept=accept)
 
     async def list(self, filters: ListPractitionersSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """List Practitioners with optional filters and pagination."""
         return await self._client.list(
+            actor,
             accept=accept,
             family_name=filters.family_name,
             given_name=filters.given_name,
             active=filters.active,
             user_id=filters.user_id,
-            org_id=filters.org_id,
             limit=filters.limit,
             offset=filters.offset,
         )
@@ -179,7 +179,7 @@ class PractitionerService:
 
     async def delete(self, resource_id: int, actor: AuthUser) -> None:
         """Permanently delete a Practitioner and all its child records."""
-        await self._client.delete(resource_id)
+        await self._client.delete(resource_id, actor)
 
     async def get_me(self, actor: AuthUser, accept: str | None = None) -> dict:
         """
@@ -191,14 +191,14 @@ class PractitionerService:
         Raises:
             HTTPException(404): If no Practitioner record is linked to this user.
         """
-        result = await self._client.list(user_id=actor.sub, limit=1, offset=0)
+        result = await self._client.list(actor, user_id=actor.sub, limit=1, offset=0)
         data = result.get("data", [])
         if not data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No Practitioner record found for this user.",
             )
-        return await self._client.get_by_id(data[0]["id"], accept=accept)
+        return await self._client.get_by_id(data[0]["id"], actor, accept=accept)
 
     # ── Helper: empty-patch guard ──────────────────────────────────────────────
 
@@ -216,9 +216,9 @@ class PractitionerService:
         """Add a HumanName to a Practitioner. Returns the full updated Practitioner."""
         return await self._client.add_name(practitioner_id, dto.model_dump(exclude_none=True, mode="json"), actor, accept=accept)
 
-    async def list_names(self, practitioner_id: int, accept: str | None = None) -> dict:
+    async def list_names(self, practitioner_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all HumanName entries for a Practitioner. Returns {data, total}."""
-        return await self._client.list_names(practitioner_id, accept=accept)
+        return await self._client.list_names(practitioner_id, actor, accept=accept)
 
     async def patch_name(self, practitioner_id: int, name_id: int, dto: PractitionerNamePatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Practitioner HumanName. Returns the full updated Practitioner."""
@@ -228,7 +228,7 @@ class PractitionerService:
 
     async def delete_name(self, practitioner_id: int, name_id: int, actor: AuthUser) -> None:
         """Remove a specific HumanName from a Practitioner."""
-        await self._client.delete_name(practitioner_id, name_id)
+        await self._client.delete_name(practitioner_id, name_id, actor)
 
     # ── Identifiers ───────────────────────────────────────────────────────────
 
@@ -236,9 +236,9 @@ class PractitionerService:
         """Add an Identifier to a Practitioner. Returns the full updated Practitioner."""
         return await self._client.add_identifier(practitioner_id, dto.model_dump(exclude_none=True, mode="json"), actor, accept=accept)
 
-    async def list_identifiers(self, practitioner_id: int, accept: str | None = None) -> dict:
+    async def list_identifiers(self, practitioner_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all Identifiers for a Practitioner. Returns {data, total}."""
-        return await self._client.list_identifiers(practitioner_id, accept=accept)
+        return await self._client.list_identifiers(practitioner_id, actor, accept=accept)
 
     async def patch_identifier(self, practitioner_id: int, identifier_id: int, dto: PractitionerIdentifierPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Practitioner Identifier. Returns the full updated Practitioner."""
@@ -248,7 +248,7 @@ class PractitionerService:
 
     async def delete_identifier(self, practitioner_id: int, identifier_id: int, actor: AuthUser) -> None:
         """Remove a specific Identifier from a Practitioner."""
-        await self._client.delete_identifier(practitioner_id, identifier_id)
+        await self._client.delete_identifier(practitioner_id, identifier_id, actor)
 
     # ── Telecom ───────────────────────────────────────────────────────────────
 
@@ -256,9 +256,9 @@ class PractitionerService:
         """Add a ContactPoint (telecom) to a Practitioner. Returns the full updated Practitioner."""
         return await self._client.add_telecom(practitioner_id, dto.model_dump(exclude_none=True, mode="json"), actor, accept=accept)
 
-    async def list_telecom(self, practitioner_id: int, accept: str | None = None) -> dict:
+    async def list_telecom(self, practitioner_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all telecom entries for a Practitioner. Returns {data, total}."""
-        return await self._client.list_telecom(practitioner_id, accept=accept)
+        return await self._client.list_telecom(practitioner_id, actor, accept=accept)
 
     async def patch_telecom(self, practitioner_id: int, telecom_id: int, dto: PractitionerTelecomPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Practitioner ContactPoint. Returns the full updated Practitioner."""
@@ -268,7 +268,7 @@ class PractitionerService:
 
     async def delete_telecom(self, practitioner_id: int, telecom_id: int, actor: AuthUser) -> None:
         """Remove a specific telecom entry from a Practitioner."""
-        await self._client.delete_telecom(practitioner_id, telecom_id)
+        await self._client.delete_telecom(practitioner_id, telecom_id, actor)
 
     # ── Addresses ─────────────────────────────────────────────────────────────
 
@@ -276,9 +276,9 @@ class PractitionerService:
         """Add an Address to a Practitioner. Returns the full updated Practitioner."""
         return await self._client.add_address(practitioner_id, dto.model_dump(exclude_none=True, mode="json"), actor, accept=accept)
 
-    async def list_addresses(self, practitioner_id: int, accept: str | None = None) -> dict:
+    async def list_addresses(self, practitioner_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all Addresses for a Practitioner. Returns {data, total}."""
-        return await self._client.list_addresses(practitioner_id, accept=accept)
+        return await self._client.list_addresses(practitioner_id, actor, accept=accept)
 
     async def patch_address(self, practitioner_id: int, address_id: int, dto: PractitionerAddressPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Practitioner Address. Returns the full updated Practitioner."""
@@ -288,7 +288,7 @@ class PractitionerService:
 
     async def delete_address(self, practitioner_id: int, address_id: int, actor: AuthUser) -> None:
         """Remove a specific Address from a Practitioner."""
-        await self._client.delete_address(practitioner_id, address_id)
+        await self._client.delete_address(practitioner_id, address_id, actor)
 
     # ── Photos ────────────────────────────────────────────────────────────────
 
@@ -296,9 +296,9 @@ class PractitionerService:
         """Add an Attachment (photo) to a Practitioner. Returns the full updated Practitioner."""
         return await self._client.add_photo(practitioner_id, dto.model_dump(exclude_none=True, mode="json"), actor, accept=accept)
 
-    async def list_photos(self, practitioner_id: int, accept: str | None = None) -> dict:
+    async def list_photos(self, practitioner_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all photos for a Practitioner. Returns {data, total}."""
-        return await self._client.list_photos(practitioner_id, accept=accept)
+        return await self._client.list_photos(practitioner_id, actor, accept=accept)
 
     async def patch_photo(self, practitioner_id: int, photo_id: int, dto: PractitionerPhotoPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Practitioner photo Attachment. Returns the full updated Practitioner."""
@@ -308,7 +308,7 @@ class PractitionerService:
 
     async def delete_photo(self, practitioner_id: int, photo_id: int, actor: AuthUser) -> None:
         """Remove a specific photo from a Practitioner."""
-        await self._client.delete_photo(practitioner_id, photo_id)
+        await self._client.delete_photo(practitioner_id, photo_id, actor)
 
     # ── Qualifications ────────────────────────────────────────────────────────
 
@@ -318,9 +318,9 @@ class PractitionerService:
             await self._validate_qualification_issuer(dto.issuer, actor)
         return await self._client.add_qualification(practitioner_id, dto.model_dump(exclude_none=True, mode="json"), actor, accept=accept)
 
-    async def list_qualifications(self, practitioner_id: int, accept: str | None = None) -> dict:
+    async def list_qualifications(self, practitioner_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all qualifications for a Practitioner. Returns {data, total}."""
-        return await self._client.list_qualifications(practitioner_id, accept=accept)
+        return await self._client.list_qualifications(practitioner_id, actor, accept=accept)
 
     async def patch_qualification(self, practitioner_id: int, qualification_id: int, dto: PractitionerQualificationPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Practitioner qualification, re-validating `issuer` if set. Returns the full updated Practitioner."""
@@ -332,7 +332,7 @@ class PractitionerService:
 
     async def delete_qualification(self, practitioner_id: int, qualification_id: int, actor: AuthUser) -> None:
         """Remove a specific qualification from a Practitioner."""
-        await self._client.delete_qualification(practitioner_id, qualification_id)
+        await self._client.delete_qualification(practitioner_id, qualification_id, actor)
 
     # ── Communications ────────────────────────────────────────────────────────
 
@@ -340,9 +340,9 @@ class PractitionerService:
         """Add a language/communication preference to a Practitioner. Returns the full updated Practitioner."""
         return await self._client.add_communication(practitioner_id, dto.model_dump(exclude_none=True, mode="json"), actor, accept=accept)
 
-    async def list_communications(self, practitioner_id: int, accept: str | None = None) -> dict:
+    async def list_communications(self, practitioner_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all communication preferences for a Practitioner. Returns {data, total}."""
-        return await self._client.list_communications(practitioner_id, accept=accept)
+        return await self._client.list_communications(practitioner_id, actor, accept=accept)
 
     async def patch_communication(self, practitioner_id: int, communication_id: int, dto: PractitionerCommunicationPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Practitioner communication entry. Returns the full updated Practitioner."""
@@ -352,4 +352,4 @@ class PractitionerService:
 
     async def delete_communication(self, practitioner_id: int, communication_id: int, actor: AuthUser) -> None:
         """Remove a specific communication entry from a Practitioner."""
-        await self._client.delete_communication(practitioner_id, communication_id)
+        await self._client.delete_communication(practitioner_id, communication_id, actor)

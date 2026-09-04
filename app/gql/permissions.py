@@ -47,7 +47,7 @@ def require_gql_permission(
     """
     request = info.context.request
     user: dict = request.state.user
-    return check_permission(user, resource, action)
+    return check_permission(user, resource, action, request.state.token)
 
 
 def authenticate_gql_subscription(
@@ -112,4 +112,4 @@ def authenticate_gql_subscription(
     except Exception:
         raise AuthenticationError("Invalid or expired token")
 
-    return check_permission(payload, resource, action)
+    return check_permission(payload, resource, action, token)

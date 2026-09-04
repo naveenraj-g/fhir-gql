@@ -372,7 +372,7 @@ async def list_practitioner_names(
     service: PractitionerService = Depends(get_practitioner_service),
 ) -> JSONResponse:
     """List all names for the specified Practitioner."""
-    data = await service.list_names(practitioner_id, accept=get_accept_header(request))
+    data = await service.list_names(practitioner_id, actor, accept=get_accept_header(request))
     return format_response(data, request)
 
 
@@ -455,7 +455,7 @@ async def list_practitioner_identifiers(
     service: PractitionerService = Depends(get_practitioner_service),
 ) -> JSONResponse:
     """List all identifiers for the specified Practitioner."""
-    data = await service.list_identifiers(practitioner_id, accept=get_accept_header(request))
+    data = await service.list_identifiers(practitioner_id, actor, accept=get_accept_header(request))
     return format_response(data, request)
 
 
@@ -538,7 +538,7 @@ async def list_practitioner_telecom(
     service: PractitionerService = Depends(get_practitioner_service),
 ) -> JSONResponse:
     """List all contact points for the specified Practitioner."""
-    data = await service.list_telecom(practitioner_id, accept=get_accept_header(request))
+    data = await service.list_telecom(practitioner_id, actor, accept=get_accept_header(request))
     return format_response(data, request)
 
 
@@ -621,7 +621,7 @@ async def list_practitioner_addresses(
     service: PractitionerService = Depends(get_practitioner_service),
 ) -> JSONResponse:
     """List all addresses for the specified Practitioner."""
-    data = await service.list_addresses(practitioner_id, accept=get_accept_header(request))
+    data = await service.list_addresses(practitioner_id, actor, accept=get_accept_header(request))
     return format_response(data, request)
 
 
@@ -704,7 +704,7 @@ async def list_practitioner_photos(
     service: PractitionerService = Depends(get_practitioner_service),
 ) -> JSONResponse:
     """List all photos for the specified Practitioner."""
-    data = await service.list_photos(practitioner_id, accept=get_accept_header(request))
+    data = await service.list_photos(practitioner_id, actor, accept=get_accept_header(request))
     return format_response(data, request)
 
 
@@ -792,7 +792,7 @@ async def list_practitioner_qualifications(
     service: PractitionerService = Depends(get_practitioner_service),
 ) -> JSONResponse:
     """List all qualifications for the specified Practitioner."""
-    data = await service.list_qualifications(practitioner_id, accept=get_accept_header(request))
+    data = await service.list_qualifications(practitioner_id, actor, accept=get_accept_header(request))
     return format_response(data, request)
 
 
@@ -879,7 +879,7 @@ async def list_practitioner_communications(
     service: PractitionerService = Depends(get_practitioner_service),
 ) -> JSONResponse:
     """List all language preferences for the specified Practitioner."""
-    data = await service.list_communications(practitioner_id, accept=get_accept_header(request))
+    data = await service.list_communications(practitioner_id, actor, accept=get_accept_header(request))
     return format_response(data, request)
 
 

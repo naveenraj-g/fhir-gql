@@ -4,7 +4,21 @@ Scope: **every filter every FHIR resource's list/search endpoint should support*
 
 ## Current state (baseline, confirmed by reading the code)
 
-`D:\code\work\projects\fhir\fhir-server\app\routers\patient.py`'s `list_patients` — the only list endpoint that exists anywhere in this stack today — supports exactly:
+**Update:** Patient has since been built out to the full target contract below —
+fhir-server's `app/routers/patient.py::list_patients` now supports `family`,
+`given`, `name`, `gender`, `active`, `user_id`, `identifier`, `birthdate`/
+`death-date` (comparator-prefixed, repeatable), `deceased`, `address` +
+`address-city`/`address-state`/`address-postalcode`/`address-country`/
+`address-use`, `telecom`/`email`/`phone`, `language`, `general-practitioner`/
+`organization`/`link` (FHIR reference strings), `sort`, and `total_mode` —
+and fhir-gql's `ListPatientsSchema`/`app/gql/patient/queries.py` mirror it
+exactly. `org_id` is no longer a filter on either side: Patient reads are
+always scoped to the caller's own org via their verified JWT (see
+fhir-server's Multi-Tenancy & Ownership rollout status in its own CLAUDE.md).
+The paragraph below describes the original, pre-rollout starting point this
+work was scoped against — kept for historical context, not current state.
+
+`D:\code\work\projects\fhir\fhir-server\app\routers\patient.py`'s `list_patients` — the only list endpoint that existed anywhere in this stack at the time this document was written — supported exactly:
 
 ```
 family_name, given_name, gender, active, user_id, org_id, limit, offset
@@ -60,20 +74,24 @@ These aren't FHIR-spec parameter names — they're the underlying *shapes* of fi
 
 Every resource from `10-resource-rollout-plan.md`'s rollout groups, with its **must-have filters beyond the universal set above**. "Ref → X" means a reference filter pointing at resource X.
 
-### Patient (exists, incomplete)
+### Patient (done — full target contract implemented)
 
 | Filter | Type | Notes |
 |---|---|---|
-| `family_name`, `given_name` | string | Already exist |
-| `gender`, `active` | token/bool | Already exist |
-| `user_id`, `org_id` | string | Already exist — tenant/identity scoping |
-| `identifier` | token | Search by MRN/SSN/etc. value — **missing today, high value** |
-| `birthdate` | date range | **Missing today** |
-| `address`, `address-city`, `address-state`, `address-postal-code` | string | **Missing today** |
-| `telecom`, `email`, `phone` | token | **Missing today** |
-| `deceased` | bool | **Missing today** |
-| `general-practitioner` | ref → Practitioner/Organization/PractitionerRole | Unlocks once Group 1 lands |
-| `organization` | ref → Organization | Managing organization |
+| `family`, `given`, `name` | string | Implemented |
+| `gender`, `active` | token/bool | Implemented |
+| `user_id` | string | Implemented — narrows within the caller's own org, never widens it |
+| `identifier` | token | Implemented — exact match on MRN/SSN/etc. value |
+| `birthdate`, `death-date` | date range | Implemented — comparator-prefixed, repeatable |
+| `address`, `address-city`, `address-state`, `address-postalcode`, `address-country`, `address-use` | string/token | Implemented |
+| `telecom`, `email`, `phone` | token | Implemented |
+| `deceased` | bool | Implemented |
+| `language` | token | Implemented — Patient.communication.language |
+| `general-practitioner` | ref → Practitioner/Organization/PractitionerRole | Implemented |
+| `organization` | ref → Organization | Managing organization — implemented |
+| `link` | ref → Patient/RelatedPerson | Implemented |
+
+`org_id` is deliberately **not** a filter — Patient reads are always scoped to the caller's own org via their verified JWT (see fhir-server's Multi-Tenancy & Ownership rollout status), never client-suppliable.
 
 ### Group 1 — Organization / Practitioner / PractitionerRole / Location
 

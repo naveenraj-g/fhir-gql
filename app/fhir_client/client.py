@@ -153,8 +153,11 @@ class FhirClient:
         Args:
             path:         FHIR Server endpoint path relative to base_url (e.g. "/organizations").
             data:         Resource payload from the schema's model_dump().
-            actor:        Authenticated user performing the operation — only `sub` is used
-                          to stamp `created_by`; org/tenant scoping is handled by the FHIR Server.
+            actor:        Authenticated user performing the operation — `sub` stamps
+                          `created_by` (unless inject_audit=False); `token` is forwarded
+                          as the Authorization header for resources (e.g. Patient) that
+                          validate the caller's JWT themselves rather than trusting the
+                          gateway unconditionally.
             accept:       Optional Accept header value forwarded from the client request.
                           When set to "application/fhir+json", the FHIR Server returns the
                           resource in FHIR R4 format instead of plain JSON.
@@ -172,6 +175,7 @@ class FhirClient:
         # Forward the Accept header per-request so the FHIR Server applies content
         # negotiation. httpx merges per-request headers with client-level headers.
         extra_headers = {"Accept": accept} if accept else {}
+        extra_headers["Authorization"] = f"Bearer {actor.token}"
         r = await self._http.post(path, json=body, headers=extra_headers)
         return await self._handle(r)
 
@@ -192,7 +196,8 @@ class FhirClient:
         Args:
             path:         FHIR Server endpoint path including the resource ID.
             data:         Partial payload from the schema's model_dump(exclude_none=True, mode="json").
-            actor:        Authenticated user performing the operation.
+            actor:        Authenticated user performing the operation — `token` is forwarded
+                          as the Authorization header (see post()'s docstring for why).
             accept:       Optional Accept header forwarded from the client request for
                           content negotiation — same semantics as in post().
             inject_audit: When True (default), injects `updated_by` from actor.sub.
@@ -204,17 +209,24 @@ class FhirClient:
         """
         body = {**data, "updated_by": actor.sub} if inject_audit else data
         extra_headers = {"Accept": accept} if accept else {}
+        extra_headers["Authorization"] = f"Bearer {actor.token}"
         r = await self._http.patch(path, json=body, headers=extra_headers)
         return await self._handle(r)
 
     async def get(
-        self, path: str, params: dict | None = None, accept: str | None = None
+        self,
+        path: str,
+        params: dict | None = None,
+        accept: str | None = None,
+        actor: AuthUser | None = None,
     ) -> dict:
         """
         Send a GET request to the FHIR Server.
 
-        No actor injection is needed for reads because the FHIR Server does not
-        update audit fields on GET operations.
+        No audit-field injection is needed for reads. `actor` is optional here
+        (unlike post()/patch()) because most resources still don't validate a
+        JWT on the FHIR Server — pass it for resources (e.g. Patient) that do,
+        so the Authorization header is forwarded.
 
         Args:
             path:   FHIR Server endpoint path (resource collection or specific resource).
@@ -223,12 +235,17 @@ class FhirClient:
                     When "application/fhir+json", the FHIR Server returns FHIR R4 format.
                     Omit (or pass None) for internal calls that always need plain JSON
                     (e.g. duplicate-detection pre-checks in the service layer).
+            actor:  Authenticated caller — when provided, forwards `token` as the
+                    Authorization header. Optional; omit for resources the FHIR
+                    Server doesn't yet authenticate directly.
 
         Returns:
             The resource or paginated collection dict from the FHIR Server, in the
             format determined by the `accept` value.
         """
         extra_headers = {"Accept": accept} if accept else {}
+        if actor is not None:
+            extra_headers["Authorization"] = f"Bearer {actor.token}"
         # httpx stringifies query param values with str(), and a plain `str, Enum`
         # member's __str__ returns "ClassName.member_name" (not its actual value)
         # on Python < 3.11 — unwrap any Enum filter value (e.g. gender=AdministrativeGender.male)
@@ -240,7 +257,7 @@ class FhirClient:
         r = await self._http.get(path, params=params, headers=extra_headers)
         return await self._handle(r)
 
-    async def delete(self, path: str) -> None:
+    async def delete(self, path: str, actor: AuthUser | None = None) -> None:
         """
         Send a DELETE request to the FHIR Server.
 
@@ -248,9 +265,14 @@ class FhirClient:
         which this method discards, so callers simply await without checking a return.
 
         Args:
-            path: FHIR Server endpoint path including the resource ID to delete.
+            path:  FHIR Server endpoint path including the resource ID to delete.
+            actor: Authenticated caller — when provided, forwards `token` as the
+                   Authorization header (see get()'s docstring for why this is optional).
         """
-        r = await self._http.delete(path)
+        extra_headers = (
+            {"Authorization": f"Bearer {actor.token}"} if actor is not None else {}
+        )
+        r = await self._http.delete(path, headers=extra_headers)
         await self._handle(r)
 
     async def aclose(self) -> None:

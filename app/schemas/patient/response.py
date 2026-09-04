@@ -32,6 +32,10 @@ class PatientNameResponse(BaseModel):
     suffix: Optional[List[str]] = None
     period_start: Optional[str] = None
     period_end: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientIdentifierResponse(BaseModel):
@@ -49,7 +53,30 @@ class PatientIdentifierResponse(BaseModel):
     value: Optional[str] = None
     period_start: Optional[str] = None
     period_end: Optional[str] = None
-    assigner: Optional[str] = None
+
+    # assigner — resolved Reference(Organization), replacing the old flat
+    # display-string field to match fhir-server's PlainPatientIdentifier.
+    assigner_type: Optional[str] = None
+    assigner_id: Optional[int] = None
+    assigner_display: Optional[str] = None
+
+    # assigner.identifier — logical-reference fallback.
+    assigner_identifier_use: Optional[str] = None
+    assigner_identifier_type_system: Optional[str] = None
+    assigner_identifier_type_version: Optional[str] = None
+    assigner_identifier_type_code: Optional[str] = None
+    assigner_identifier_type_display: Optional[str] = None
+    assigner_identifier_type_text: Optional[str] = None
+    assigner_identifier_type_user_selected: Optional[bool] = None
+    assigner_identifier_system: Optional[str] = None
+    assigner_identifier_value: Optional[str] = None
+    assigner_identifier_period_start: Optional[str] = None
+    assigner_identifier_period_end: Optional[str] = None
+
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientTelecomResponse(BaseModel):
@@ -64,6 +91,10 @@ class PatientTelecomResponse(BaseModel):
     rank: Optional[int] = None
     period_start: Optional[str] = None
     period_end: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientAddressResponse(BaseModel):
@@ -83,6 +114,10 @@ class PatientAddressResponse(BaseModel):
     country: Optional[str] = None
     period_start: Optional[str] = None
     period_end: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientPhotoResponse(BaseModel):
@@ -99,6 +134,10 @@ class PatientPhotoResponse(BaseModel):
     hash: Optional[str] = None
     title: Optional[str] = None
     creation: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientContactTelecomResponse(BaseModel):
@@ -113,6 +152,10 @@ class PatientContactTelecomResponse(BaseModel):
     rank: Optional[int] = None
     period_start: Optional[str] = None
     period_end: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientContactRelationshipResponse(BaseModel):
@@ -125,6 +168,10 @@ class PatientContactRelationshipResponse(BaseModel):
     coding_code: Optional[str] = None
     coding_display: Optional[str] = None
     text: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientContactResponse(BaseModel):
@@ -161,8 +208,26 @@ class PatientContactResponse(BaseModel):
     organization_type: Optional[str] = None
     organization_id: Optional[int] = None
     organization_display: Optional[str] = None
+
+    # organization.identifier — logical-reference fallback.
+    organization_identifier_use: Optional[str] = None
+    organization_identifier_type_system: Optional[str] = None
+    organization_identifier_type_version: Optional[str] = None
+    organization_identifier_type_code: Optional[str] = None
+    organization_identifier_type_display: Optional[str] = None
+    organization_identifier_type_text: Optional[str] = None
+    organization_identifier_type_user_selected: Optional[bool] = None
+    organization_identifier_system: Optional[str] = None
+    organization_identifier_value: Optional[str] = None
+    organization_identifier_period_start: Optional[str] = None
+    organization_identifier_period_end: Optional[str] = None
+
     period_start: Optional[str] = None
     period_end: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientCommunicationResponse(BaseModel):
@@ -176,6 +241,10 @@ class PatientCommunicationResponse(BaseModel):
     language_display: Optional[str] = None
     language_text: Optional[str] = None
     preferred: Optional[bool] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 class PatientGeneralPractitionerResponse(BaseModel):
@@ -188,6 +257,24 @@ class PatientGeneralPractitionerResponse(BaseModel):
     reference_id: Optional[int] = None
     reference_display: Optional[str] = None
 
+    # generalPractitioner.identifier — logical-reference fallback.
+    reference_identifier_use: Optional[str] = None
+    reference_identifier_type_system: Optional[str] = None
+    reference_identifier_type_version: Optional[str] = None
+    reference_identifier_type_code: Optional[str] = None
+    reference_identifier_type_display: Optional[str] = None
+    reference_identifier_type_text: Optional[str] = None
+    reference_identifier_type_user_selected: Optional[bool] = None
+    reference_identifier_system: Optional[str] = None
+    reference_identifier_value: Optional[str] = None
+    reference_identifier_period_start: Optional[str] = None
+    reference_identifier_period_end: Optional[str] = None
+
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
+
 
 class PatientLinkResponse(BaseModel):
     """Plain response for a single Patient link to another Patient or RelatedPerson."""
@@ -198,7 +285,25 @@ class PatientLinkResponse(BaseModel):
     other_type: Optional[str] = None
     other_id: Optional[int] = None
     other_display: Optional[str] = None
+
+    # link.other.identifier — logical-reference fallback.
+    other_identifier_use: Optional[str] = None
+    other_identifier_type_system: Optional[str] = None
+    other_identifier_type_version: Optional[str] = None
+    other_identifier_type_code: Optional[str] = None
+    other_identifier_type_display: Optional[str] = None
+    other_identifier_type_text: Optional[str] = None
+    other_identifier_type_user_selected: Optional[bool] = None
+    other_identifier_system: Optional[str] = None
+    other_identifier_value: Optional[str] = None
+    other_identifier_period_start: Optional[str] = None
+    other_identifier_period_end: Optional[str] = None
+
     type: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    created_by: Optional[str] = None
+    updated_by: Optional[str] = None
 
 
 # ── Sub-resource list response wrappers ───────────────────────────────────────
@@ -298,6 +403,20 @@ class PatientResponse(BaseModel):
     managing_organization_type: Optional[str] = None
     managing_organization_id: Optional[int] = None
     managing_organization_display: Optional[str] = None
+
+    # managingOrganization.identifier — logical-reference fallback.
+    managing_organization_identifier_use: Optional[str] = None
+    managing_organization_identifier_type_system: Optional[str] = None
+    managing_organization_identifier_type_version: Optional[str] = None
+    managing_organization_identifier_type_code: Optional[str] = None
+    managing_organization_identifier_type_display: Optional[str] = None
+    managing_organization_identifier_type_text: Optional[str] = None
+    managing_organization_identifier_type_user_selected: Optional[bool] = None
+    managing_organization_identifier_system: Optional[str] = None
+    managing_organization_identifier_value: Optional[str] = None
+    managing_organization_identifier_period_start: Optional[str] = None
+    managing_organization_identifier_period_end: Optional[str] = None
+
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     created_by: Optional[str] = None
@@ -345,6 +464,20 @@ class PatientCoreResponse(BaseModel):
     managing_organization_type: Optional[str] = None
     managing_organization_id: Optional[int] = None
     managing_organization_display: Optional[str] = None
+
+    # managingOrganization.identifier — logical-reference fallback.
+    managing_organization_identifier_use: Optional[str] = None
+    managing_organization_identifier_type_system: Optional[str] = None
+    managing_organization_identifier_type_version: Optional[str] = None
+    managing_organization_identifier_type_code: Optional[str] = None
+    managing_organization_identifier_type_display: Optional[str] = None
+    managing_organization_identifier_type_text: Optional[str] = None
+    managing_organization_identifier_type_user_selected: Optional[bool] = None
+    managing_organization_identifier_system: Optional[str] = None
+    managing_organization_identifier_value: Optional[str] = None
+    managing_organization_identifier_period_start: Optional[str] = None
+    managing_organization_identifier_period_end: Optional[str] = None
+
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     created_by: Optional[str] = None

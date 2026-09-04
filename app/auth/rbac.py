@@ -3,7 +3,7 @@ from fastapi import HTTPException, Request, status
 from app.auth.models import AuthUser
 
 
-def check_permission(user: dict, resource: str, action: str) -> AuthUser:
+def check_permission(user: dict, resource: str, action: str, token: str) -> AuthUser:
     """
     Core RBAC rule — the single source of truth for `resource:action` checks.
 
@@ -16,6 +16,8 @@ def check_permission(user: dict, resource: str, action: str) -> AuthUser:
         user:     The decoded JWT payload (request.state.user).
         resource: Permission resource name, e.g. "patient".
         action:   Permission action, e.g. "read" | "create" | "update" | "delete".
+        token:    The raw JWT string, re-forwarded to fhir-server as the
+                  Authorization header for resources that validate it themselves.
 
     Returns:
         A typed AuthUser built from the JWT's `sub` / `activeOrganizationId` claims.
@@ -34,6 +36,7 @@ def check_permission(user: dict, resource: str, action: str) -> AuthUser:
     return AuthUser(
         sub=user.get("sub", ""),
         org_id=user.get("activeOrganizationId"),
+        token=token,
     )
 
 
@@ -47,7 +50,7 @@ def require_permission(resource: str, action: str):
     """
 
     async def _check(request: Request) -> AuthUser:
-        return check_permission(request.state.user, resource, action)
+        return check_permission(request.state.user, resource, action, request.state.token)
 
     _check.required_permission = f"{resource}:{action}"
     return _check

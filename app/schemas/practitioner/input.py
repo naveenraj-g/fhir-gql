@@ -13,11 +13,16 @@ exactly (same array semantics: omit/null = untouched, [] = delete all,
 [{...}] = full replace on PATCH).
 
 Design notes:
-  - user_id/org_id are Optional (matches Organization/HealthcareService,
-    unlike Location's/Patient's required fields) — ported faithfully from
-    the sibling project.
-  - created_by/updated_by are NOT exposed — FhirClient injects them from
-    actor.sub automatically.
+  - user_id is Optional (matches Organization/HealthcareService, unlike
+    Location's/Patient's required field).
+  - org_id is deliberately NOT a field here at all: fhir-server derives it
+    from the verified JWT's `activeOrganizationId` claim itself for
+    Practitioner (JWT/RBAC rollout) — a client-supplied org_id would be
+    rejected outright (extra="forbid", no such field declared).
+    created_by/updated_by are NOT exposed either — fhir-server derives both
+    from the verified JWT's `sub` claim; FhirClient forwards the caller's
+    JWT (inject_audit=False) rather than injecting these fields into the
+    body.
   - `qualification.issuer` is a FHIR reference to the issuing Organization —
     validated for existence + tenant match in PractitionerService (the only
     cross-resource reference anywhere on Practitioner; FHIR itself has no
@@ -56,7 +61,6 @@ class PractitionerCreateSchema(BaseModel):
         json_schema_extra={
             "example": {
                 "user_id": "user-uuid-123",
-                "org_id": "org-uuid-456",
                 "active": True,
                 "gender": "female",
                 "birth_date": "1978-03-15",
@@ -65,7 +69,6 @@ class PractitionerCreateSchema(BaseModel):
     )
 
     user_id: Optional[str] = Field(None, description="User identifier for tenant scoping.")
-    org_id: Optional[str] = Field(None, description="Organization identifier for tenant scoping.")
 
     active: Optional[bool] = Field(True, description="Whether this practitioner record is active.")
     gender: Optional[AdministrativeGender] = Field(None, description="male|female|other|unknown")
@@ -91,13 +94,17 @@ class PractitionerPatchSchema(BaseModel):
 
 
 class ListPractitionersSchema(BaseModel):
-    """Query parameters for listing practitioners."""
+    """Query parameters for listing practitioners.
+
+    org_id is deliberately NOT a filter here: fhir-server always scopes
+    Practitioner reads to the caller's own org via the verified JWT (JWT/RBAC
+    rollout) — matches Patient's ListPatientsSchema.
+    """
 
     family_name: Optional[str] = Field(None, description="Partial, case-insensitive match on family name.")
     given_name: Optional[str] = Field(None, description="Partial, case-insensitive match on given name.")
     active: Optional[bool] = None
     user_id: Optional[str] = None
-    org_id: Optional[str] = None
     limit: int = Field(20, ge=1, le=200)
     offset: int = Field(0, ge=0)
 

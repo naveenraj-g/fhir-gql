@@ -3,22 +3,21 @@ API router for FHIR Organization resources.
 
 Exposes CRUD endpoints under /organizations:
     POST   /organizations/                    — register a new Organization
-    GET    /organizations/me                 — get Organizations for the current user
     GET    /organizations/{organization_id}  — fetch a single Organization by ID
     GET    /organizations/                    — paginated list with filters
     PATCH  /organizations/{organization_id}  — partial update (scalar fields only)
     DELETE /organizations/{organization_id}  — permanent delete
 
-Route ordering is critical: /me must appear before /{organization_id} so
-FastAPI does not attempt to cast the literal string "me" as an integer —
-same reasoning as app/routers/patient.py.
+Unlike Patient/Practitioner there is no /me route — fhir-server's
+Organization has no user_id at all (a shared tenant-level entity, not scoped
+to an individual end-user), so there's no "my own organizations" concept.
 
 Content negotiation:
   Accept: application/json         → plain snake_case JSON (default)
   Accept: application/fhir+json    → FHIR R4 resource / Bundle
 
-RBAC: all endpoints require the "org" permission resource (matching the
-sibling project's naming convention this feature was ported from).
+RBAC: all endpoints require the "organization" permission resource,
+matching fhir-server's own RBAC scope naming exactly.
 
 Tenant scoping: get_by_id/update/delete are scoped to the caller's org_id by
 OrganizationsService (404 if the resource belongs to a different org) — see
@@ -40,19 +39,17 @@ from app.core.schema_utils import inline_schema
 from app.di.dependencies.organization import get_organization_service
 from app.schemas.organization.fhir_schemas import FhirBundleResponse, FhirOrgResponse
 from app.schemas.organization.input import (
-    ListOrgsSchema,
-    MeOrgsSchema,
-    PatchOrgSchema,
-    RegisterOrgSchema,
+    ListOrganizationsSchema,
+    OrganizationCreateSchema,
+    OrganizationPatchSchema,
 )
-from app.schemas.organization.response import OrgResponse, PaginatedOrgResponse
+from app.schemas.organization.response import OrganizationResponse, PaginatedOrganizationResponse
 from app.services.organization_service import OrganizationsService
 
 router = APIRouter(prefix="/organizations", tags=["Organizations"])
 
 # ── Shared error response dicts ───────────────────────────────────────────────
 _ERR_NOT_FOUND = {404: {"description": "Organization not found"}}
-_ERR_CONFLICT = {409: {"description": "Organization with that name already exists"}}
 _ERR_VALIDATION = {422: {"description": "Validation error"}}
 
 # ── Dual-format success response dicts for OpenAPI documentation ───────────────
@@ -64,7 +61,7 @@ _SINGLE_201 = {
         "description": "Organization created successfully",
         "content": {
             "application/json": {
-                "schema": inline_schema(OrgResponse.model_json_schema())
+                "schema": inline_schema(OrganizationResponse.model_json_schema())
             },
             "application/fhir+json": {
                 "schema": inline_schema(FhirOrgResponse.model_json_schema())
@@ -78,7 +75,7 @@ _SINGLE_200 = {
         "description": "Organization retrieved/updated successfully",
         "content": {
             "application/json": {
-                "schema": inline_schema(OrgResponse.model_json_schema())
+                "schema": inline_schema(OrganizationResponse.model_json_schema())
             },
             "application/fhir+json": {
                 "schema": inline_schema(FhirOrgResponse.model_json_schema())
@@ -92,7 +89,7 @@ _LIST_200 = {
         "description": "Paginated list of Organizations",
         "content": {
             "application/json": {
-                "schema": inline_schema(PaginatedOrgResponse.model_json_schema())
+                "schema": inline_schema(PaginatedOrganizationResponse.model_json_schema())
             },
             "application/fhir+json": {
                 "schema": inline_schema(FhirBundleResponse.model_json_schema())
@@ -111,50 +108,26 @@ _LIST_200 = {
     operation_id="register_organization",
     summary="Register a new Organization",
     description=(
-        "Creates a new Organization. "
-        "Enforces that `name` and `type` are provided (FHIR leaves these optional). "
-        "Deduplicates by name — returns 409 if an organization with the same name already exists. "
-        "If `partof` is provided, it must reference an existing organization in the caller's own "
-        "tenant — returns 404 otherwise. "
-        "`created_by` is stamped automatically from the caller's JWT — do not supply it. "
+        "Creates a new Organization and any combination of its sub-resources "
+        "(identifier, type, alias, telecom, address, contact, endpoint) atomically in one "
+        "request. If `partof` is provided, fhir-server validates it exists, belongs to the "
+        "caller's own tenant, and wouldn't create a circular hierarchy — 404/422 otherwise. "
+        "`org_id`/`created_by` are stamped automatically from the caller's JWT — do not supply "
+        "them (not accepted fields at all). "
         "Send `Accept: application/fhir+json` to receive the created resource in FHIR R4 format."
     ),
-    responses={**_SINGLE_201, **_ERR_CONFLICT, **_ERR_VALIDATION, **_ERR_NOT_FOUND},
-    dependencies=[Depends(require_permission("org", "create"))],
+    responses={**_SINGLE_201, **_ERR_VALIDATION, **_ERR_NOT_FOUND},
+    dependencies=[Depends(require_permission("organization", "create"))],
 )
 async def register_organization(
-    dto: RegisterOrgSchema,
+    dto: OrganizationCreateSchema,
     request: Request,
-    actor: AuthUser = Depends(require_permission("org", "create")),
+    actor: AuthUser = Depends(require_permission("organization", "create")),
     service: OrganizationsService = Depends(get_organization_service),
 ) -> JSONResponse:
     """Register a new Organization. Forwards Accept header for content negotiation."""
-    data = await service.register(dto, actor, accept=get_accept_header(request))
+    data = await service.create(dto, actor, accept=get_accept_header(request))
     return format_response(data, request)
-
-
-@router.get(
-    "/me",
-    operation_id="get_my_organizations",
-    summary="Get Organizations for the current user",
-    description=(
-        "Returns Organizations scoped to the calling user's JWT identity. "
-        "`user_id` and `org_id` are derived from the token — the caller cannot override them. "
-        "Supports `active` filter and `limit`/`offset` pagination. "
-        "Send `Accept: application/fhir+json` to receive results as a FHIR Bundle searchset."
-    ),
-    responses={**_LIST_200},
-    dependencies=[Depends(require_permission("org", "read"))],
-)
-async def get_my_organizations(
-    request: Request,
-    filters: MeOrgsSchema = Depends(),
-    actor: AuthUser = Depends(require_permission("org", "read")),
-    service: OrganizationsService = Depends(get_organization_service),
-) -> JSONResponse:
-    """List Organizations owned by the current user, scoped server-side by JWT claims."""
-    data = await service.get_me(filters, actor, accept=get_accept_header(request))
-    return format_paginated_response(data, request)
 
 
 @router.get(
@@ -166,12 +139,12 @@ async def get_my_organizations(
         "organization. Send `Accept: application/fhir+json` to receive the resource in FHIR R4 format."
     ),
     responses={**_SINGLE_200, **_ERR_NOT_FOUND},
-    dependencies=[Depends(require_permission("org", "read"))],
+    dependencies=[Depends(require_permission("organization", "read"))],
 )
 async def get_organization(
     organization_id: int,
     request: Request,
-    actor: AuthUser = Depends(require_permission("org", "read")),
+    actor: AuthUser = Depends(require_permission("organization", "read")),
     service: OrganizationsService = Depends(get_organization_service),
 ) -> JSONResponse:
     """Fetch a single Organization by ID. Forwards Accept header for content negotiation."""
@@ -192,12 +165,12 @@ async def get_organization(
         "Send `Accept: application/fhir+json` to receive results as a FHIR Bundle searchset."
     ),
     responses={**_LIST_200},
-    dependencies=[Depends(require_permission("org", "read"))],
+    dependencies=[Depends(require_permission("organization", "read"))],
 )
 async def list_organizations(
     request: Request,
-    filters: ListOrgsSchema = Depends(),
-    actor: AuthUser = Depends(require_permission("org", "read")),
+    filters: ListOrganizationsSchema = Depends(),
+    actor: AuthUser = Depends(require_permission("organization", "read")),
     service: OrganizationsService = Depends(get_organization_service),
 ) -> JSONResponse:
     """List Organizations with optional filters."""
@@ -217,13 +190,13 @@ async def list_organizations(
         "Send `Accept: application/fhir+json` to receive the updated resource in FHIR R4 format."
     ),
     responses={**_SINGLE_200, **_ERR_NOT_FOUND, **_ERR_VALIDATION},
-    dependencies=[Depends(require_permission("org", "update"))],
+    dependencies=[Depends(require_permission("organization", "update"))],
 )
 async def update_organization(
     organization_id: int,
-    dto: PatchOrgSchema,
+    dto: OrganizationPatchSchema,
     request: Request,
-    actor: AuthUser = Depends(require_permission("org", "update")),
+    actor: AuthUser = Depends(require_permission("organization", "update")),
     service: OrganizationsService = Depends(get_organization_service),
 ) -> JSONResponse:
     """Partially update an Organization. Forwards Accept header for content negotiation."""
@@ -243,11 +216,11 @@ async def update_organization(
         "scoped to the caller's organization. This operation is irreversible."
     ),
     responses={**_ERR_NOT_FOUND},
-    dependencies=[Depends(require_permission("org", "delete"))],
+    dependencies=[Depends(require_permission("organization", "delete"))],
 )
 async def delete_organization(
     organization_id: int,
-    actor: AuthUser = Depends(require_permission("org", "delete")),
+    actor: AuthUser = Depends(require_permission("organization", "delete")),
     service: OrganizationsService = Depends(get_organization_service),
 ) -> None:
     """Delete an Organization. No content negotiation — DELETE returns 204 with no body."""

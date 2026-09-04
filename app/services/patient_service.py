@@ -155,7 +155,7 @@ class PatientService:
         Returns:
             The Patient resource dict with all child arrays populated.
         """
-        return await self._client.get_by_id(patient_id, accept=accept)
+        return await self._client.get_by_id(patient_id, actor, accept=accept)
 
     async def get_core_by_id(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """
@@ -174,7 +174,7 @@ class PatientService:
         Returns:
             The Patient dict with scalar fields only — no sub-resource keys.
         """
-        return await self._client.get_core_by_id(patient_id, accept=accept)
+        return await self._client.get_core_by_id(patient_id, actor, accept=accept)
 
     async def get_me(self, actor: AuthUser, accept: str | None = None) -> dict:
         """
@@ -199,8 +199,10 @@ class PatientService:
             HTTPException(404): If no Patient record is linked to this user.
         """
         # Use plain JSON for the lookup so we can inspect data[] regardless of
-        # what format the client ultimately wants.
-        result = await self._client.list(user_id=actor.sub, org_id=actor.org_id, limit=1, offset=0)
+        # what format the client ultimately wants. org_id is no longer a valid
+        # filter — fhir-server always scopes Patient reads to the caller's own
+        # org via the verified JWT, so user_id alone is enough to find "me".
+        result = await self._client.list(actor, user_id=actor.sub, limit=1, offset=0)
         data = result.get("data", [])
         if not data:
             raise HTTPException(
@@ -209,44 +211,54 @@ class PatientService:
             )
         # Re-fetch by ID with the correct accept header so the response format
         # matches what the caller requested (plain JSON or FHIR R4).
-        return await self._client.get_by_id(data[0]["id"], accept=accept)
+        return await self._client.get_by_id(data[0]["id"], actor, accept=accept)
 
     async def list(self, filters: ListPatientsSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """
         List Patients with optional filters and pagination.
 
-        Forwards all non-None filter values to the fhir-server. family_name and
-        given_name perform partial, case-insensitive matches against the
-        patient_name child table on the fhir-server.
+        Forwards all non-None filter values to the fhir-server, translating
+        each field to the exact (possibly hyphenated) query-string key
+        fhir-server's list_patients route expects — see ListPatientsSchema's
+        docstring. org_id is never forwarded: fhir-server always scopes
+        Patient reads to the caller's own org via the verified JWT.
 
         Args:
             filters: Validated query parameters from the router.
-            actor:   Authenticated caller (kept for RBAC interface consistency).
+            actor:   Authenticated caller — forwarded as the Authorization header.
             accept:  Content-type preference forwarded to the fhir-server.
 
         Returns:
             Paginated plain JSON or FHIR Bundle depending on accept.
         """
         return await self._client.list(
+            actor,
             accept=accept,
-            family_name=filters.family_name,
-            given_name=filters.given_name,
+            family=filters.family,
+            given=filters.given,
+            name=filters.name,
             gender=filters.gender,
             active=filters.active,
             user_id=filters.user_id,
-            org_id=filters.org_id,
             identifier=filters.identifier,
-            birth_date_from=filters.birth_date_from,
-            birth_date_to=filters.birth_date_to,
-            address_city=filters.address_city,
-            address_state=filters.address_state,
-            address_postal_code=filters.address_postal_code,
+            birthdate=filters.birthdate,
+            **{"death-date": filters.death_date},
+            deceased=filters.deceased,
+            address=filters.address,
+            **{
+                "address-city": filters.address_city,
+                "address-state": filters.address_state,
+                "address-postalcode": filters.address_postal_code,
+                "address-country": filters.address_country,
+                "address-use": filters.address_use,
+                "general-practitioner": filters.general_practitioner,
+            },
+            telecom=filters.telecom,
             email=filters.email,
             phone=filters.phone,
-            deceased=filters.deceased,
-            general_practitioner_type=filters.general_practitioner_type,
-            general_practitioner_id=filters.general_practitioner_id,
-            organization_id=filters.organization_id,
+            language=filters.language,
+            organization=filters.organization,
+            link=filters.link,
             sort=filters.sort,
             total_mode=filters.total_mode,
             limit=filters.limit,
@@ -290,7 +302,7 @@ class PatientService:
             patient_id: The patient's integer primary key to delete.
             actor:      Authenticated caller (kept for RBAC interface consistency).
         """
-        await self._client.delete(patient_id)
+        await self._client.delete(patient_id, actor)
 
     # ── Helper: empty-patch guard ──────────────────────────────────────────────
 
@@ -322,7 +334,7 @@ class PatientService:
 
     async def list_names(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all HumanName entries for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_names(patient_id, accept=accept)
+        return await self._client.list_names(patient_id, actor, accept=accept)
 
     async def patch_name(self, patient_id: int, name_id: int, dto: NamePatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient HumanName. Returns the full updated Patient."""
@@ -332,7 +344,7 @@ class PatientService:
 
     async def delete_name(self, patient_id: int, name_id: int, actor: AuthUser) -> None:
         """Remove a specific HumanName from a Patient."""
-        await self._client.delete_name(patient_id, name_id)
+        await self._client.delete_name(patient_id, name_id, actor)
 
     # ── Identifiers ───────────────────────────────────────────────────────────
 
@@ -342,7 +354,7 @@ class PatientService:
 
     async def list_identifiers(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all Identifiers for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_identifiers(patient_id, accept=accept)
+        return await self._client.list_identifiers(patient_id, actor, accept=accept)
 
     async def patch_identifier(self, patient_id: int, identifier_id: int, dto: IdentifierPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient Identifier. Returns the full updated Patient."""
@@ -352,7 +364,7 @@ class PatientService:
 
     async def delete_identifier(self, patient_id: int, identifier_id: int, actor: AuthUser) -> None:
         """Remove a specific Identifier from a Patient."""
-        await self._client.delete_identifier(patient_id, identifier_id)
+        await self._client.delete_identifier(patient_id, identifier_id, actor)
 
     # ── Telecom ───────────────────────────────────────────────────────────────
 
@@ -362,7 +374,7 @@ class PatientService:
 
     async def list_telecom(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all telecom entries for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_telecom(patient_id, accept=accept)
+        return await self._client.list_telecom(patient_id, actor, accept=accept)
 
     async def patch_telecom(self, patient_id: int, telecom_id: int, dto: TelecomPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient ContactPoint. Returns the full updated Patient."""
@@ -372,7 +384,7 @@ class PatientService:
 
     async def delete_telecom(self, patient_id: int, telecom_id: int, actor: AuthUser) -> None:
         """Remove a specific telecom entry from a Patient."""
-        await self._client.delete_telecom(patient_id, telecom_id)
+        await self._client.delete_telecom(patient_id, telecom_id, actor)
 
     # ── Addresses ─────────────────────────────────────────────────────────────
 
@@ -382,7 +394,7 @@ class PatientService:
 
     async def list_addresses(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all Addresses for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_addresses(patient_id, accept=accept)
+        return await self._client.list_addresses(patient_id, actor, accept=accept)
 
     async def patch_address(self, patient_id: int, address_id: int, dto: AddressPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient Address. Returns the full updated Patient."""
@@ -392,7 +404,7 @@ class PatientService:
 
     async def delete_address(self, patient_id: int, address_id: int, actor: AuthUser) -> None:
         """Remove a specific Address from a Patient."""
-        await self._client.delete_address(patient_id, address_id)
+        await self._client.delete_address(patient_id, address_id, actor)
 
     # ── Photos ────────────────────────────────────────────────────────────────
 
@@ -402,7 +414,7 @@ class PatientService:
 
     async def list_photos(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all photos for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_photos(patient_id, accept=accept)
+        return await self._client.list_photos(patient_id, actor, accept=accept)
 
     async def patch_photo(self, patient_id: int, photo_id: int, dto: PhotoPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient photo Attachment. Returns the full updated Patient."""
@@ -412,7 +424,7 @@ class PatientService:
 
     async def delete_photo(self, patient_id: int, photo_id: int, actor: AuthUser) -> None:
         """Remove a specific photo from a Patient."""
-        await self._client.delete_photo(patient_id, photo_id)
+        await self._client.delete_photo(patient_id, photo_id, actor)
 
     # ── Contacts ──────────────────────────────────────────────────────────────
 
@@ -422,7 +434,7 @@ class PatientService:
 
     async def list_contacts(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all contacts for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_contacts(patient_id, accept=accept)
+        return await self._client.list_contacts(patient_id, actor, accept=accept)
 
     async def patch_contact(self, patient_id: int, contact_id: int, dto: ContactPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient contact. Returns the full updated Patient."""
@@ -432,7 +444,7 @@ class PatientService:
 
     async def delete_contact(self, patient_id: int, contact_id: int, actor: AuthUser) -> None:
         """Remove a specific contact (and its child relationship/telecom records) from a Patient."""
-        await self._client.delete_contact(patient_id, contact_id)
+        await self._client.delete_contact(patient_id, contact_id, actor)
 
     # ── Communications ────────────────────────────────────────────────────────
 
@@ -442,7 +454,7 @@ class PatientService:
 
     async def list_communications(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all communication preferences for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_communications(patient_id, accept=accept)
+        return await self._client.list_communications(patient_id, actor, accept=accept)
 
     async def patch_communication(self, patient_id: int, comm_id: int, dto: CommunicationPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient communication entry. Returns the full updated Patient."""
@@ -452,7 +464,7 @@ class PatientService:
 
     async def delete_communication(self, patient_id: int, comm_id: int, actor: AuthUser) -> None:
         """Remove a specific communication entry from a Patient."""
-        await self._client.delete_communication(patient_id, comm_id)
+        await self._client.delete_communication(patient_id, comm_id, actor)
 
     # ── General Practitioners ─────────────────────────────────────────────────
 
@@ -462,7 +474,7 @@ class PatientService:
 
     async def list_general_practitioners(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all generalPractitioner references for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_general_practitioners(patient_id, accept=accept)
+        return await self._client.list_general_practitioners(patient_id, actor, accept=accept)
 
     async def patch_general_practitioner(self, patient_id: int, gp_id: int, dto: GeneralPractitionerPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient generalPractitioner reference. Returns the full updated Patient."""
@@ -472,7 +484,7 @@ class PatientService:
 
     async def delete_general_practitioner(self, patient_id: int, gp_id: int, actor: AuthUser) -> None:
         """Remove a specific generalPractitioner reference from a Patient."""
-        await self._client.delete_general_practitioner(patient_id, gp_id)
+        await self._client.delete_general_practitioner(patient_id, gp_id, actor)
 
     # ── Links ─────────────────────────────────────────────────────────────────
 
@@ -482,7 +494,7 @@ class PatientService:
 
     async def list_links(self, patient_id: int, actor: AuthUser, accept: str | None = None) -> dict:
         """List all links for a Patient. Returns {data: [...], total: N}."""
-        return await self._client.list_links(patient_id, accept=accept)
+        return await self._client.list_links(patient_id, actor, accept=accept)
 
     async def patch_link(self, patient_id: int, link_id: int, dto: LinkPatchSchema, actor: AuthUser, accept: str | None = None) -> dict:
         """Partially update a Patient link. Returns the full updated Patient."""
@@ -492,4 +504,4 @@ class PatientService:
 
     async def delete_link(self, patient_id: int, link_id: int, actor: AuthUser) -> None:
         """Remove a specific link from a Patient."""
-        await self._client.delete_link(patient_id, link_id)
+        await self._client.delete_link(patient_id, link_id, actor)

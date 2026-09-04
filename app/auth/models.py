@@ -7,7 +7,6 @@ the FHIR server (audit trail: who created/updated/deleted a resource).
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass
@@ -25,6 +24,10 @@ class AuthUser:
         org_id: The organization the user is currently acting on behalf of.
                 Comes from a custom `org_id` claim in the JWT. Optional because
                 super-admin tokens may not be scoped to a specific organization.
+        token:  The raw, still-valid JWT string this AuthUser was built from.
+                Forwarded as `Authorization: Bearer <token>` on every fhir-server
+                request for Patient, which now validates JWTs independently
+                instead of trusting the gateway unconditionally.
     """
 
     # JWT subject — the unique, stable identifier for this user across all services.
@@ -32,4 +35,7 @@ class AuthUser:
 
     # Active organization context — used to scope all FHIR resource reads and writes
     # to the tenant the user is currently operating under. None for org-less tokens.
-    org_id: Optional[str]
+    org_id: str | None
+
+    # Raw JWT — re-forwarded downstream so fhir-server can verify it itself.
+    token: str
