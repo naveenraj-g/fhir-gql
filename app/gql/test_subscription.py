@@ -6,7 +6,7 @@ actual API surface, just a place to verify subscriptions work end-to-end
 """
 
 import asyncio
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import strawberry
 
@@ -25,7 +25,7 @@ class TestSubscription:
     @strawberry.subscription
     async def count(
         self, info: strawberry.types.Info, target: int = 100
-    ) -> AsyncGenerator[int, None]:
+    ) -> AsyncGenerator[int]:
         """
         Yield 0..target-1, one value every 0.5s — a minimal streaming demo.
 

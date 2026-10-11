@@ -1,3 +1,4 @@
+from ._shared import OrganizationCodingResponse
 from .address import OrganizationAddressResponse
 from .alias import OrganizationAliasResponse
 from .contact import OrganizationContactResponse, OrganizationContactTelecomResponse
@@ -10,6 +11,7 @@ from .type import OrganizationTypeResponse
 __all__ = [
     "OrganizationAddressResponse",
     "OrganizationAliasResponse",
+    "OrganizationCodingResponse",
     "OrganizationContactResponse",
     "OrganizationContactTelecomResponse",
     "OrganizationEndpointResponse",

@@ -43,6 +43,7 @@ from app.fhir_client.schedule import ScheduleClient
 from app.fhir_client.slot import SlotClient
 from app.schemas.slot.input import ListSlotsSchema, SlotCreateSchema, SlotGenerateSchema, SlotPatchSchema
 from app.services.tenant_scope import validate_reference
+from app.core.logging import trace_methods
 
 # Day-of-week codes in datetime.weekday() order (0=Monday..6=Sunday),
 # matching the DayOfWeek enum's wire values used across this project.
@@ -73,6 +74,7 @@ def _overlaps_any(start: datetime, end: datetime, periods: List[Tuple[datetime, 
     return any(start < period_end and end > period_start for period_start, period_end in periods)
 
 
+@trace_methods
 class SlotService:
     """
     Application service for Slot CRUD and bulk-generation use cases.

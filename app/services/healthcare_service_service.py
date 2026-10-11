@@ -35,8 +35,10 @@ from app.schemas.healthcare_service.input import (
     HealthcareServicePatchSchema,
     ListHealthcareServicesSchema,
 )
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class HealthcareServiceService:
     """
     Application service for HealthcareService CRUD use cases.

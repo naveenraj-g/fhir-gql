@@ -20,10 +20,12 @@ first, the top-level `OrganizationType` / `PaginatedOrganizationType` last.
 """
 
 import strawberry
+from strawberry.scalars import JSON
 
 from app.schemas.organization.response import (
     OrganizationAddressResponse,
     OrganizationAliasResponse,
+    OrganizationCodingResponse,
     OrganizationContactResponse,
     OrganizationContactTelecomResponse,
     OrganizationEndpointResponse,
@@ -35,6 +37,15 @@ from app.schemas.organization.response import (
 )
 
 # ── Response (output) types — leaf sub-resources first ───────────────────────
+
+
+@strawberry.experimental.pydantic.type(
+    model=OrganizationCodingResponse,
+    all_fields=True,
+    description="A single Coding entry — reused by Organization.type, Organization.identifier.type, and Organization.contact.purpose.",
+)
+class OrganizationCodingType:
+    """A single Coding entry (system/version/code/display/userSelected)."""
 
 
 @strawberry.experimental.pydantic.type(
@@ -117,6 +128,12 @@ class OrganizationEndpointType:
 class OrganizationType:
     """A full Organization resource, including all nested sub-resource arrays."""
 
+    # Pydantic types this as list[dict] — strawberry's pydantic integration
+    # can't auto-map a bare `dict` to a GraphQL type, so it's overridden
+    # explicitly with the JSON scalar here (all_fields=True still respects
+    # an explicit annotation over auto-deriving one).
+    extension: JSON | None
+
 
 @strawberry.experimental.pydantic.type(
     model=PaginatedOrganizationResponse,
@@ -130,6 +147,7 @@ class PaginatedOrganizationType:
 __all__ = [
     "OrganizationAddressType",
     "OrganizationAliasType",
+    "OrganizationCodingType",
     "OrganizationContactTelecomType",
     "OrganizationContactType",
     "OrganizationEndpointType",

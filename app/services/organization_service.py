@@ -36,8 +36,10 @@ from app.schemas.organization.input import (
     OrganizationCreateSchema,
     OrganizationPatchSchema,
 )
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class OrganizationsService:
     """
     Application service for Organization CRUD use cases.

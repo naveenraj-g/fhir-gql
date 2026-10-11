@@ -11,10 +11,12 @@ Reference: https://hl7.org/fhir/R4/slot.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 _PATH = "/slots"
 
 
+@trace_methods
 class SlotClient:
     """
     Domain-specific HTTP client for Slot resources.

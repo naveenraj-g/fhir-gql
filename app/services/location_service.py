@@ -30,8 +30,10 @@ from app.schemas.location.input import (
     LocationCreateSchema,
     LocationPatchSchema,
 )
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class LocationService:
     """
     Application service for Location CRUD use cases.

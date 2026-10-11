@@ -12,12 +12,13 @@ class OrganizationTelecomInput(BaseModel):
     """Organization.telecom — a contact detail for the organization (ContactPoint)."""
 
     model_config = ConfigDict(extra="forbid")
-    system: ContactPointSystem = Field(
-        ...,
+    # system/value are 0..1 on ContactPoint — not required even here.
+    system: ContactPointSystem | None = Field(
+        None,
         description="Telecommunications form for the contact point — what communications system is required to make use of it: phone|fax|email|pager|url|sms|other.",
     )
-    value: str = Field(
-        ...,
+    value: str | None = Field(
+        None,
         description="The actual contact point details, in a form meaningful to the designated communication system (e.g. a phone number or email address).",
     )
     use: ContactPointUse | None = Field(

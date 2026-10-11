@@ -109,7 +109,7 @@ def authenticate_gql_subscription(
         raise AuthenticationError("Token expired")
     except jwt.InvalidTokenError:
         raise AuthenticationError("Invalid token")
-    except Exception:
+    except jwt.PyJWTError:
         raise AuthenticationError("Invalid or expired token")
 
     return check_permission(payload, resource, action, token)

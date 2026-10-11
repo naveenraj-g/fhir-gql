@@ -17,7 +17,7 @@ to release the connection pool gracefully before the process exits.
 import redis.asyncio as redis
 from redis.asyncio.client import Redis
 
-from app.config import settings
+from app.core.config import settings
 
 # Shared async Redis client for the lifetime of the process.
 # - encoding="utf-8": all byte strings returned by Redis are decoded to str automatically.

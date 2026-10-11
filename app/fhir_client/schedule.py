@@ -12,10 +12,12 @@ Reference: https://hl7.org/fhir/R4/schedule.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 _PATH = "/schedules"
 
 
+@trace_methods
 class ScheduleClient:
     """
     Domain-specific HTTP client for Schedule resources.

@@ -29,11 +29,13 @@ Reference: https://hl7.org/fhir/R4/practitionerrole.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 # Base path for all PractitionerRole endpoints on the fhir-server.
 _PATH = "/practitioner-roles"
 
 
+@trace_methods
 class PractitionerRoleClient:
     """
     Domain-specific HTTP client for PractitionerRole resources.

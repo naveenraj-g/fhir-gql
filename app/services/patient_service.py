@@ -43,8 +43,10 @@ from app.schemas.patient.input import (
     TelecomCreateSchema,
     TelecomPatchSchema,
 )
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class PatientService:
     """
     Application service for Patient CRUD and sub-resource operations.

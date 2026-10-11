@@ -21,8 +21,10 @@ import httpx
 from fastapi import HTTPException
 
 from app.auth.models import AuthUser
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class FhirClient:
     """
     Async HTTP wrapper around the FHIR Server REST API.

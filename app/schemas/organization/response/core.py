@@ -37,9 +37,13 @@ class OrganizationResponse(BaseModel):
     name: str | None = Field(
         None, description="A name associated with the organization."
     )
+    partof_reference: str | None = Field(
+        None,
+        description="The raw literal reference string as received — relative or an absolute URL to another system entirely — kept independently of whether it resolves locally.",
+    )
     partof: str | None = Field(
         None,
-        description="Resolved FHIR reference to the parent organization, e.g. 'Organization/190001'.",
+        description="Resolved FHIR reference to the parent organization, e.g. 'Organization/190001' — populated only when partof_reference resolves to a local row.",
     )
     partof_type: str | None = Field(
         None, description="Resolved reference target type (always 'Organization')."
@@ -107,6 +111,10 @@ class OrganizationResponse(BaseModel):
     endpoint: list[OrganizationEndpointResponse] | None = Field(
         None,
         description="Technical endpoints providing access to services operated for the organization.",
+    )
+    extension: list[dict] | None = Field(
+        None,
+        description="Resource-level FHIR extensions, as raw [{url, valueType, value}, ...] entries.",
     )
     org_id: str | None = Field(
         None,

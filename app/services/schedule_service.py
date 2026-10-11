@@ -59,6 +59,7 @@ from app.schemas.schedule.input import (
     SchedulePatchSchema,
 )
 from app.services.tenant_scope import validate_reference
+from app.core.logging import trace_methods
 
 # Actor reference types this project has a client for, and can therefore
 # existence-+-tenant-validate. FHIR also allows RelatedPerson/Device, which
@@ -70,6 +71,7 @@ _UNVALIDATED_ACTOR_TYPES = {"RelatedPerson", "Device"}
 _PROVIDER_ACTOR_TYPES = {"Practitioner", "PractitionerRole"}
 
 
+@trace_methods
 class ScheduleService:
     """
     Application service for Schedule CRUD use cases.

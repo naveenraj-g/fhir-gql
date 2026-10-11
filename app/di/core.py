@@ -14,7 +14,7 @@ importing it directly.
 
 from dependency_injector import containers, providers
 
-from app.config import settings
+from app.core.config import settings
 from app.fhir_client.client import FhirClient
 from app.fhir_client.terminology import TerminologyClient
 

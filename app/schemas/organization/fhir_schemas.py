@@ -166,6 +166,10 @@ class FhirOrgResponse(BaseModel):
     id: str = Field(
         description="Logical FHIR resource ID (string representation of the DB primary key)"
     )
+    extension: list[dict] | None = Field(
+        default=None,
+        description="Resource-level FHIR extensions, as raw [{url, valueType, value}, ...] entries",
+    )
     active: bool | None = Field(
         default=None,
         description="Whether the organisation's record is still in active use",

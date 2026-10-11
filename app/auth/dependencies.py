@@ -18,7 +18,7 @@ import jwt
 from jwt import PyJWKClient
 from fastapi import Request
 
-from app.config import settings
+from app.core.config import settings
 from app.errors.auth import AuthenticationError
 
 # Module-level singleton for the JWKS client.

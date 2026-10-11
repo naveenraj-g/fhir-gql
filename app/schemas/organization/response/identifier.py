@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from ._shared import _AuditFields
+from ._shared import OrganizationCodingResponse, _AuditFields
 
 
 class OrganizationIdentifierResponse(_AuditFields):
@@ -8,27 +8,11 @@ class OrganizationIdentifierResponse(_AuditFields):
     use: str | None = Field(
         None, description="Identifies the purpose for this identifier, if known."
     )
-    type_system: str | None = Field(
-        None,
-        description="The code system that defines the meaning of the identifier type code.",
-    )
-    type_version: str | None = Field(
-        None,
-        description="The version of the code system used for the identifier type code.",
-    )
-    type_code: str | None = Field(
-        None,
-        description="A symbol in syntax defined by the code system (e.g. NPI, DEA, license).",
-    )
-    type_display: str | None = Field(
-        None, description="A representation of the meaning of the identifier type code."
+    type_codings: list[OrganizationCodingResponse] | None = Field(
+        None, description="Coding(s) for this identifier's type."
     )
     type_text: str | None = Field(
         None, description="A human language representation of the identifier's type."
-    )
-    type_user_selected: bool | None = Field(
-        None,
-        description="Whether this identifier-type coding was chosen by a user directly.",
     )
     system: str | None = Field(
         None, description="Establishes the namespace for the value."
@@ -45,12 +29,20 @@ class OrganizationIdentifierResponse(_AuditFields):
         None,
         description="End of the time period during which this identifier is/was valid for use.",
     )
+    assigner_reference: str | None = Field(
+        None,
+        description="The raw literal reference string as received (relative or an absolute URL to another system entirely) — independent of whether it resolves locally.",
+    )
     assigner: str | None = Field(
         None,
-        description="Resolved FHIR reference to the issuing organization, e.g. 'Organization/190001'.",
+        description="Resolved FHIR reference to the issuing organization, e.g. 'Organization/190001' — populated only when assigner_reference resolves to a local row.",
+    )
+    assigner_type: str | None = Field(
+        None, description="Resolved reference target type (always 'Organization')."
     )
     assigner_id: int | None = Field(
-        None, description="Internal ID of the resolved assigning Organization, if any."
+        None,
+        description="Internal ID of the resolved assigning Organization, populated only when assigner_reference resolves to a local row.",
     )
     assigner_display: str | None = Field(
         None,

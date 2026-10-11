@@ -1,0 +1,59 @@
+# Application-behavior config for fhir-gql. Checked into git — not a secret.
+# True per-environment values (where the FHIR Server/terminology service/IAM
+# live, the Redis URL) still live in .env, never here. Precedence, highest
+# first: real env var > .env > this file > field defaults — see
+# app/core/config.py's Settings.settings_customise_sources().
+#
+# Deliberately NOT here: a routes-style config for enabling/disabling
+# individual GraphQL queries or mutations. This gateway's schema is fixed at
+# import time (app/gql/schema.py) — there's no per-field toggle mechanism.
+
+app:
+  title: "Middleware API — Patient"
+  version: "0.1.0"
+  # Gates only the interactive /docs and /redoc UIs. /openapi.json stays
+  # reachable regardless.
+  docs_enabled: true
+
+cors:
+  # No CORSMiddleware is registered at all while this is false.
+  enabled: true
+  allow_origins:
+    - "http://localhost:3000"
+  allow_credentials: true
+  allow_methods: ["*"]
+  allow_headers: ["*"]
+
+redis:
+  # Global switch. false skips attempting a Redis connection at startup
+  # entirely and goes straight to RateLimitMiddleware's in-process fallback.
+  enabled: true
+
+rate_limit:
+  read_limit: 100
+  write_limit: 20
+  window_seconds: 60
+
+logging:
+  # Root log level. DEBUG turns on per-method flow tracing for every
+  # trace_methods()-wrapped service/client; INFO keeps only the access log
+  # and hand-placed business events.
+  level: INFO
+
+  # "json" (one JSON object per line — what log aggregators want) or
+  # "console" (flat, human-readable). Use console locally, json everywhere else.
+  format: json
+
+  # ⚠️ PHI WARNING — LOCAL DEVELOPMENT ONLY, NEVER ENABLE IN PRODUCTION.
+  # Dumps full resolver/service/client call arguments at DEBUG: patient
+  # names, addresses, identifiers. `redact` below is a backstop for obvious
+  # secrets, NOT a PHI safeguard.
+  debug_payloads: false
+
+  # Field names masked even when debug_payloads is on, matched
+  # case-insensitively at any nesting depth.
+  redact:
+    - authorization
+    - token
+    - password
+    - secret

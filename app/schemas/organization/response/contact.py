@@ -1,6 +1,6 @@
 from pydantic import Field
 
-from ._shared import _AuditFields
+from ._shared import OrganizationCodingResponse, _AuditFields
 
 
 class OrganizationContactTelecomResponse(_AuditFields):
@@ -29,16 +29,8 @@ class OrganizationContactTelecomResponse(_AuditFields):
 
 class OrganizationContactResponse(_AuditFields):
     id: int = Field(..., description="Internal row ID — use for sub-resource lookups.")
-    purpose_system: str | None = Field(
-        None,
-        description="The code system that defines the meaning of the contact's purpose code.",
-    )
-    purpose_code: str | None = Field(
-        None,
-        description="A symbol in syntax defined by the code system (e.g. 'ADMIN', 'BILL', 'PRESS').",
-    )
-    purpose_display: str | None = Field(
-        None, description="A representation of the meaning of the purpose code."
+    purpose_codings: list[OrganizationCodingResponse] | None = Field(
+        None, description="Coding(s) for this contact's purpose."
     )
     purpose_text: str | None = Field(
         None, description="A human language representation of the contact's purpose."

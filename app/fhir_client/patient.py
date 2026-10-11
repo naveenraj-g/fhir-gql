@@ -26,11 +26,13 @@ Reference: https://hl7.org/fhir/R4/patient.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 # Base path for all Patient endpoints on the fhir-server.
 _PATH = "/patients"
 
 
+@trace_methods
 class PatientClient:
     """
     Domain-specific HTTP client for Patient resources.

@@ -42,7 +42,7 @@ wired here with `core=core` (plus any sibling sub-container it needs
 directly, as Practitioner needs `organization`,
 Schedule needs `practitioner`+`practitioner_role`+`location`+`healthcare_service`+`patient`,
 and Slot needs `schedule`+`practitioner_role`), then added to
-app/routers/__init__.py and app/gql/schema.py.
+app/gql/schema.py.
 """
 
 from dependency_injector import containers, providers

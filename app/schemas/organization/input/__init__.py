@@ -1,3 +1,4 @@
+from ._shared import OrganizationCodingInput
 from .address import OrganizationAddressInput
 from .alias import OrganizationAliasInput
 from .contact import OrganizationContactInput, OrganizationContactTelecomInput
@@ -15,6 +16,7 @@ __all__ = [
     "ListOrganizationsSchema",
     "OrganizationAddressInput",
     "OrganizationAliasInput",
+    "OrganizationCodingInput",
     "OrganizationContactInput",
     "OrganizationContactTelecomInput",
     "OrganizationCreateSchema",

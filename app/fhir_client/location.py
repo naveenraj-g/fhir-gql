@@ -24,11 +24,13 @@ Reference: https://hl7.org/fhir/R4/location.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 # Base path for all Location endpoints on the fhir-server.
 _PATH = "/locations"
 
 
+@trace_methods
 class LocationClient:
     """
     Domain-specific HTTP client for Location resources.

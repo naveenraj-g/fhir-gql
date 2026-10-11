@@ -71,7 +71,9 @@ class OrganizationMutation:
         ],
         input: Annotated[
             OrganizationPatchInput,
-            strawberry.argument(description="Fields to update — only these are written."),
+            strawberry.argument(
+                description="Fields to update — only these are written."
+            ),
         ],
     ) -> OrganizationType:
         """Partially update an Organization — mirrors PATCH /organizations/{id}."""

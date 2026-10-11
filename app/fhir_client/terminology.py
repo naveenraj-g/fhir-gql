@@ -14,8 +14,10 @@ the httpx connection pool is shared and reused across all terminology requests.
 
 import httpx
 from fastapi import HTTPException
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class TerminologyClient:
     """
     HTTP client for the terminology endpoints on the fhir-server.

@@ -16,7 +16,7 @@ REST clients get via `{"detail": ...}`.
 """
 
 import functools
-from typing import Awaitable, Callable, TypeVar
+from collections.abc import Awaitable, Callable
 
 import pydantic
 from fastapi import HTTPException
@@ -24,10 +24,8 @@ from graphql import GraphQLError
 
 from app.core.errors import AppError
 
-T = TypeVar("T")
 
-
-def translate_errors(
+def translate_errors[T](
     resolver: Callable[..., Awaitable[T]],
 ) -> Callable[..., Awaitable[T]]:
     """

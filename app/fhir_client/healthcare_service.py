@@ -27,11 +27,13 @@ Reference: https://hl7.org/fhir/R4/healthcareservice.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 # Base path for all HealthcareService endpoints on the fhir-server.
 _PATH = "/healthcare-services"
 
 
+@trace_methods
 class HealthcareServiceClient:
     """
     Domain-specific HTTP client for HealthcareService resources.

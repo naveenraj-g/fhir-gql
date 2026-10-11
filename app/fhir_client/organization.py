@@ -28,11 +28,13 @@ Reference: https://hl7.org/fhir/R4/organization.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 # Base path for all Organization endpoints on the fhir-server.
 _PATH = "/organizations"
 
 
+@trace_methods
 class OrganizationClient:
     """
     Domain-specific HTTP client for Organization resources.

@@ -56,8 +56,10 @@ from app.schemas.practitioner.input import (
     PractitionerTelecomPatchSchema,
 )
 from app.services.tenant_scope import validate_reference
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class PractitionerService:
     """
     Application service for Practitioner CRUD and sub-resource operations.

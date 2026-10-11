@@ -15,8 +15,10 @@ class OrganizationAddressInput(BaseModel):
     use: AddressUse | None = Field(
         None, description="The purpose of this address — home|work|temp|old|billing."
     )
-    type: AddressType = Field(
-        ...,
+    # type/city/state/postal_code/country are all 0..1 on Address — none of
+    # them required even here.
+    type: AddressType | None = Field(
+        None,
         description="Distinguishes between physical addresses (those you can visit) and mailing addresses (e.g. PO Boxes and care-of addresses) — postal|physical|both.",
     )
     text: str | None = Field(
@@ -27,23 +29,23 @@ class OrganizationAddressInput(BaseModel):
         None,
         description="The house number, apartment number, street name, street direction, P.O. Box number, delivery hints, and similar information.",
     )
-    city: str = Field(
-        ...,
+    city: str | None = Field(
+        None,
         description="The name of the city, town, suburb, village or other community or delivery center.",
     )
     district: str | None = Field(
         None, description="The name of the administrative area (county)."
     )
-    state: str = Field(
-        ...,
+    state: str | None = Field(
+        None,
         description="Sub-unit of a country with limited sovereignty in a federally organized country.",
     )
-    postal_code: str = Field(
-        ...,
+    postal_code: str | None = Field(
+        None,
         description="A postal code designating a region defined by the postal service.",
     )
-    country: str = Field(
-        ...,
+    country: str | None = Field(
+        None,
         description="Country — a nation as commonly understood or generally accepted.",
     )
     period_start: datetime | None = Field(

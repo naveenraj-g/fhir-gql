@@ -7,8 +7,9 @@ app/gql/organization/types/response.py.
 Naming convention:
   - `<X>Schema` (Pydantic) -> `<X>Input` (GraphQL input type)
   - Pydantic input schemas that already share a name with the GraphQL
-    wrapper class defined here (OrganizationIdentifierInput,
-    OrganizationTypeInput, OrganizationAliasInput, OrganizationTelecomInput,
+    wrapper class defined here (OrganizationCodingInput,
+    OrganizationIdentifierInput, OrganizationTypeInput,
+    OrganizationAliasInput, OrganizationTelecomInput,
     OrganizationAddressInput, OrganizationContactTelecomInput,
     OrganizationContactInput, OrganizationEndpointInput) are imported under
     a `...Schema` alias so the plain name is free for this module's GraphQL
@@ -19,6 +20,7 @@ first, `OrganizationCreateInput`/`OrganizationPatchInput` last.
 """
 
 import strawberry
+from strawberry.scalars import JSON
 
 # Registers AddressUse/ContactPointSystem/etc. as GraphQL enums (side-effect
 # import) — required before wrapping any input schema whose fields use them.
@@ -28,6 +30,9 @@ from app.schemas.organization.input import (
 )
 from app.schemas.organization.input import (
     OrganizationAliasInput as OrganizationAliasInputSchema,
+)
+from app.schemas.organization.input import (
+    OrganizationCodingInput as OrganizationCodingInputSchema,
 )
 from app.schemas.organization.input import (
     OrganizationContactInput as OrganizationContactInputSchema,
@@ -53,6 +58,15 @@ from app.schemas.organization.input import (
 )
 
 # ── Input types — leaf sub-resources first ───────────────────────────────────
+
+
+@strawberry.experimental.pydantic.input(
+    model=OrganizationCodingInputSchema,
+    all_fields=True,
+    description="Input for one entry of a CodeableConcept's coding[] — reused by Organization.type, Organization.identifier.type, and Organization.contact.purpose.",
+)
+class OrganizationCodingInput:
+    """Input for one Coding entry (system/version/code/display/userSelected)."""
 
 
 @strawberry.experimental.pydantic.input(
@@ -140,6 +154,12 @@ class OrganizationEndpointInput:
 class OrganizationCreateInput:
     """Input for `createOrganization` — mirrors OrganizationCreateSchema exactly."""
 
+    # Pydantic types this as list[dict] — strawberry's pydantic integration
+    # can't auto-map a bare `dict` to a GraphQL type, so it's overridden
+    # explicitly with the JSON scalar here (all_fields=True still respects
+    # an explicit annotation over auto-deriving one).
+    extension: JSON | None = None
+
 
 @strawberry.experimental.pydantic.input(
     model=OrganizationPatchSchema,
@@ -153,6 +173,9 @@ class OrganizationCreateInput:
 class OrganizationPatchInput:
     """Input for `updateOrganization` — every field optional, at least one must be set."""
 
+    # See OrganizationCreateInput's extension override above.
+    extension: JSON | None = None
+
 
 # `ListOrganizationsSchema` is a query-parameter schema, not a mutation
 # payload — GraphQL convention is to expose filters as plain field arguments
@@ -162,6 +185,7 @@ class OrganizationPatchInput:
 __all__ = [
     "OrganizationAddressInput",
     "OrganizationAliasInput",
+    "OrganizationCodingInput",
     "OrganizationContactInput",
     "OrganizationContactTelecomInput",
     "OrganizationCreateInput",

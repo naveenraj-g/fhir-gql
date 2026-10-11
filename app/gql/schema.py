@@ -4,19 +4,24 @@ and exposes it as a FastAPI-mountable router.
 
 Adding a new resource to the GraphQL API means: write its
 `app/gql/types/<resource>.py` + `app/gql/resolvers/<resource>.py`, then add
-its Query/Mutation mixin below — this mirrors how `app/routers/__init__.py`
-aggregates REST routers into one `api_router`.
+its Query/Mutation mixin below.
+
+GraphQL is this service's only transport — the REST routers that used to
+live in app/routers/ have been removed (app/schemas/ stays; every type
+below is still derived from those same Pydantic models, and REST can be
+rebuilt on top of them again later if needed).
 """
 
 import strawberry
 from strawberry.fastapi import GraphQLRouter
 
-from app.config import settings
+from app.core.config import settings
 from app.gql.context import get_context
 from app.gql.healthcare_service.mutations import HealthcareServiceMutation
 from app.gql.healthcare_service.queries import HealthcareServiceQuery
 from app.gql.location.mutations import LocationMutation
 from app.gql.location.queries import LocationQuery
+from app.gql.logging import GqlLoggingExtension
 from app.gql.organization.mutations import OrganizationMutation
 from app.gql.organization.queries import OrganizationQuery
 from app.gql.patient.mutations import PatientMutation
@@ -74,7 +79,13 @@ class Subscription(TestSubscription):
     """"""
 
 
-schema = strawberry.Schema(query=Query, mutation=Mutation, subscription=Subscription)
+schema = strawberry.Schema(
+    query=Query,
+    mutation=Mutation,
+    subscription=Subscription,
+    # One log line per operation — see app/gql/logging.py's docstring.
+    extensions=[GqlLoggingExtension],
+)
 
 # GraphiQL (the in-browser IDE served on GET /graphql) is convenient for
 # local/dev testing but disabled in production to avoid exposing schema

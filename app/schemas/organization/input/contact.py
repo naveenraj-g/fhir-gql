@@ -13,17 +13,20 @@ from app.schemas.enums import (
     HumanNameUse,
 )
 
+from ._shared import OrganizationCodingInput
+
 
 class OrganizationContactTelecomInput(BaseModel):
     """Organization.contact.telecom — a contact detail for the contact person (ContactPoint)."""
 
     model_config = ConfigDict(extra="forbid")
-    system: ContactPointSystem = Field(
-        ...,
+    # system/value are 0..1 on ContactPoint — not required even here.
+    system: ContactPointSystem | None = Field(
+        None,
         description="Telecommunications form for the contact point — what communications system is required to make use of it: phone|fax|email|pager|url|sms|other.",
     )
-    value: str = Field(
-        ...,
+    value: str | None = Field(
+        None,
         description="The actual contact point details, in a form meaningful to the designated communication system.",
     )
     use: ContactPointUse | None = Field(
@@ -49,21 +52,18 @@ class OrganizationContactInput(BaseModel):
     """Organization.contact — contact for the organization for a certain purpose (BackboneElement)."""
 
     model_config = ConfigDict(extra="forbid")
-    purpose_system: str | None = Field(
+    # purpose (0..1 CodeableConcept) — "Indicates a purpose for which the
+    # contact can be reached." purpose_text is the CodeableConcept's own
+    # field; purpose_coding is the real 0..* coding list — see
+    # OrganizationCodingInput's docstring.
+    purpose_coding: list[OrganizationCodingInput] | None = Field(
         None,
-        description="The identification of the code system that defines the meaning of the contact's purpose code.",
-    )
-    purpose_code: str | None = Field(
-        None,
-        description="A symbol in syntax defined by the code system (e.g. 'ADMIN', 'BILL', 'PRESS').",
-    )
-    purpose_display: str | None = Field(
-        None,
-        description="A representation of the meaning of the purpose code, following the rules of the system.",
+        description="Coding(s) for this contact's purpose — e.g. 'ADMIN', 'BILL', 'PRESS'.",
     )
     purpose_text: str | None = Field(
         None, description="A human language representation of the contact's purpose."
     )
+    # name (0..1 HumanName) — "A name associated with the contact."
     name_use: HumanNameUse | None = Field(
         None, description="Identifies the purpose for this name."
     )
@@ -91,11 +91,14 @@ class OrganizationContactInput(BaseModel):
         None,
         description="End of the period during which this name was valid for the contact.",
     )
+    # address (0..1 Address) — "Visiting or postal addresses for the
+    # contact." type/city/state/postal_code/country are all 0..1 on
+    # Address — none of them required even here.
     address_use: AddressUse | None = Field(
         None, description="The purpose of this address — home|work|temp|old|billing."
     )
-    address_type: AddressType = Field(
-        ...,
+    address_type: AddressType | None = Field(
+        None,
         description="Distinguishes between physical addresses (those you can visit) and mailing addresses — postal|physical|both.",
     )
     address_text: str | None = Field(
@@ -106,23 +109,23 @@ class OrganizationContactInput(BaseModel):
         None,
         description="The house number, apartment number, street name, and similar information.",
     )
-    address_city: str = Field(
-        ...,
+    address_city: str | None = Field(
+        None,
         description="The name of the city, town, suburb, village or other community or delivery center.",
     )
     address_district: str | None = Field(
         None, description="The name of the administrative area (county)."
     )
-    address_state: str = Field(
-        ...,
+    address_state: str | None = Field(
+        None,
         description="Sub-unit of a country with limited sovereignty in a federally organized country.",
     )
-    address_postal_code: str = Field(
-        ...,
+    address_postal_code: str | None = Field(
+        None,
         description="A postal code designating a region defined by the postal service.",
     )
-    address_country: str = Field(
-        ...,
+    address_country: str | None = Field(
+        None,
         description="Country — a nation as commonly understood or generally accepted.",
     )
     address_period_start: datetime | None = Field(
@@ -131,6 +134,7 @@ class OrganizationContactInput(BaseModel):
     address_period_end: datetime | None = Field(
         None, description="End of the time period when this address was/is in use."
     )
+    # telecom (0..*)
     telecom: list[OrganizationContactTelecomInput] | None = Field(
         None,
         description="A contact detail (e.g. a telephone number or an email address) by which the contact person may be reached.",

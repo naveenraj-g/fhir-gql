@@ -6,19 +6,17 @@ including the plain `GET /graphql` that serves the GraphiQL IDE's HTML/JS
 shell — and does so before it decides whether to render that IDE or execute
 an operation (see `should_render_graphql_ide` in
 strawberry/http/base.py). That ordering is why auth can't simply be a
-router-level FastAPI dependency the way REST's
-`dependencies=[Depends(get_current_user)]` is on `api_router`: gating the
-whole router would 401 a browser's bare navigation to `GET /graphql`, which
-cannot attach an `Authorization` header.
+router-level FastAPI `dependencies=[Depends(get_current_user)]` the way a
+REST router's would be: gating the whole router would 401 a browser's bare
+navigation to `GET /graphql`, which cannot attach an `Authorization` header.
 
 Instead, this module mirrors Strawberry's own IDE-vs-operation predicate:
 skip auth only for the exact request shape that renders the IDE (`GET` with
 no `query` parameter); authenticate everything else. Combined with
 `allow_queries_via_get=False` (app/gql/schema.py) — which stops a GraphQL
 operation from ever being smuggled in as `GET /graphql?query=...` to dodge
-this check — every real query/mutation still goes through the identical
-`get_current_user` REST uses, just called from here instead of as a
-Depends().
+this check — every real query/mutation still goes through `get_current_user`,
+just called from here instead of as a Depends().
 """
 
 import strawberry
@@ -27,6 +25,7 @@ from starlette.requests import HTTPConnection
 from strawberry.fastapi import BaseContext
 
 from app.auth.dependencies import get_current_user
+from app.core.request_context import bind_actor
 from app.di.container import Container
 
 
@@ -113,5 +112,11 @@ async def get_context(request: HTTPConnection) -> GraphQLContext:
     # asking for its own HTML/JS, not a GraphQL operation.
     is_ide_page_load = request.method == "GET" and "query" not in request.query_params
     if not is_ide_page_load:
-        await get_current_user(request)
+        payload = await get_current_user(request)
+        # Attach the verified actor to this request's logging context — the
+        # single place every real GraphQL operation passes through, mirroring
+        # fhir-server's require_permission()/bind_actor() call site. See
+        # app.core.request_context.bind_actor's docstring for why this needs
+        # to write to both a ContextVar and request.state.
+        bind_actor(request, payload.get("sub"), payload.get("org_id"))
     return GraphQLContext()

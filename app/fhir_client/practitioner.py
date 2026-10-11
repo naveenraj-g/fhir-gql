@@ -27,10 +27,12 @@ Reference: https://hl7.org/fhir/R4/practitioner.html
 
 from app.auth.models import AuthUser
 from app.fhir_client.client import FhirClient
+from app.core.logging import trace_methods
 
 _PATH = "/practitioners"
 
 
+@trace_methods
 class PractitionerClient:
     """
     Domain-specific HTTP client for Practitioner resources.

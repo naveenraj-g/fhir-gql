@@ -8,12 +8,22 @@ provides one (useful for distributed tracing where the caller already has an ID)
 or generated fresh as a UUID4 otherwise.
 
 The ID is also attached to `request.state.request_id` so route handlers can
-include it in response bodies (e.g. the /health endpoint).
+include it in response bodies (e.g. the /health endpoint), and to
+`request_id_ctx_var` (app.core.request_context) so every log line emitted
+anywhere below this middleware — resolver, service, client — carries it
+automatically, with zero plumbing at the call site (see that module's
+docstring for why a ContextVar, not a function argument).
 """
 
 import uuid
 from fastapi import Request
 from starlette.middleware.base import BaseHTTPMiddleware
+
+from app.core.request_context import (
+    actor_org_id_ctx_var,
+    actor_user_id_ctx_var,
+    request_id_ctx_var,
+)
 
 
 class RequestIdMiddleware(BaseHTTPMiddleware):
@@ -46,6 +56,14 @@ class RequestIdMiddleware(BaseHTTPMiddleware):
         # Store on request.state so route handlers and other middleware can read it
         # without re-parsing the header.
         request.state.request_id = request_id
+        request_id_ctx_var.set(request_id)
+
+        # Actor fields are per-request too, but get set later (GraphQL's
+        # get_context(), once the JWT is verified) — reset them here so a
+        # worker task reused across requests can't leak the previous
+        # request's actor into this one's logs before that point.
+        actor_user_id_ctx_var.set(None)
+        actor_org_id_ctx_var.set(None)
 
         response = await call_next(request)
 

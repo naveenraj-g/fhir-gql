@@ -39,8 +39,10 @@ from app.schemas.practitioner_role.input import (
     PractitionerRoleCreateSchema,
     PractitionerRolePatchSchema,
 )
+from app.core.logging import trace_methods
 
 
+@trace_methods
 class PractitionerRoleService:
     """
     Application service for PractitionerRole CRUD use cases.
