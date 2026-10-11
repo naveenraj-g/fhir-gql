@@ -15,6 +15,16 @@ app:
   # reachable regardless.
   docs_enabled: true
 
+connectors:
+  # Which backend system this gateway's resource clients/services talk to
+  # — see app/connectors/base.py and app/connectors/registry.py. Every
+  # resource client is written against the Connector interface, never
+  # against a specific backend, so this is the only thing that decides
+  # which system is live. "fhir_server" = this application (our own
+  # fhir-server). Add another connector's name here once one is
+  # registered in app/connectors/registry.py.
+  active: fhir_server
+
 cors:
   # No CORSMiddleware is registered at all while this is false.
   enabled: true

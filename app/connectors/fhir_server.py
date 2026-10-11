@@ -1,18 +1,25 @@
 """
-Low-level async HTTP client for communicating with the downstream FHIR Server.
+The connector for *this application* — our own fhir-server.
 
-This class is the single point of contact between this middleware service and the
-FHIR Server that owns all persistence. It wraps httpx.AsyncClient to:
+Low-level async HTTP client implementing app.connectors.base.Connector
+against fhir-server's own REST conventions (base path /api/fhir/v1,
+plain-JSON `created_by`/`updated_by` audit injection on write, FHIR
+`OperationOutcome` error bodies). This is the one point of contact between
+this gateway and fhir-server — it wraps httpx.AsyncClient to:
   - Set a shared base URL and Content-Type header on every request.
   - Automatically inject audit fields (created_by / updated_by) into write request
-    bodies from the caller's JWT subject so the FHIR Server can record audit trails
+    bodies from the caller's JWT subject so fhir-server can record audit trails
     without callers needing to remember to include those fields.
   - Normalise HTTP error responses into FastAPI HTTPExceptions with the status code
-    and detail message forwarded from the FHIR Server's own error body.
+    and detail message forwarded from fhir-server's own error body.
 
-The client is managed as a Singleton by the DI container (app.di.core.CoreContainer)
-so the underlying httpx connection pool is shared and reused across all requests.
-`aclose()` must be called during application shutdown to drain the pool cleanly.
+Every resource client (app/fhir_client/organization.py, etc.) is written
+against the Connector Protocol, not against this class directly — this is
+just today's only implementation of it. Selected via configs/config.yaml's
+`connectors.active` (see app.connectors.registry) and constructed once as a
+Singleton by app.di.core.CoreContainer, so the underlying httpx connection
+pool is shared and reused across all requests. `aclose()` must be called
+during application shutdown to drain the pool cleanly.
 """
 
 from enum import Enum
@@ -25,26 +32,28 @@ from app.core.logging import trace_methods
 
 
 @trace_methods
-class FhirClient:
+class FhirServerConnector:
     """
-    Async HTTP wrapper around the FHIR Server REST API.
+    Async HTTP wrapper around fhir-server's REST API — the connector for
+    *this application*. See module docstring.
 
-    All domain-specific clients (e.g. OrganizationClient) depend on this class to
-    perform the actual HTTP calls. This separation keeps FHIR-path knowledge in the
-    domain clients while error handling and actor injection live here once.
+    All domain-specific clients (e.g. OrganizationClient) depend on the
+    Connector Protocol this class satisfies to perform the actual HTTP
+    calls. This separation keeps FHIR-path knowledge in the domain clients
+    while error handling and actor injection live here once.
     """
 
     def __init__(self, base_url: str):
         """
-        Initialise the HTTP client with the FHIR Server base URL.
+        Initialise the HTTP client with fhir-server's base URL.
 
         Args:
-            base_url: Root URL of the FHIR Server (e.g. http://localhost:8001/api/fhir/v1).
+            base_url: Root URL of fhir-server (e.g. http://localhost:8001/api/fhir/v1).
                       All path arguments passed to post/get/patch/delete are appended
                       to this base URL by httpx automatically.
         """
         # timeout=10.0 seconds balances user-facing latency with avoiding indefinite
-        # hangs if the FHIR Server is slow or unreachable. Adjust if bulk operations
+        # hangs if fhir-server is slow or unreachable. Adjust if bulk operations
         # are introduced that legitimately take longer.
         # follow_redirects=True: FastAPI routers emit 307 Temporary Redirect when a
         # trailing-slash variant of a URL is requested (e.g. /organizations →
@@ -63,19 +72,19 @@ class FhirClient:
 
         Handles three cases:
           1. 204 No Content — successful operation with no body (e.g. DELETE). Returns None.
-          2. 4xx/5xx — raises HTTPException with the FHIR Server's status code and
+          2. 4xx/5xx — raises HTTPException with fhir-server's status code and
              a detail message extracted from its FHIR `OperationOutcome` error body
              (falls back to raw text if the body isn't JSON or isn't an OperationOutcome).
           3. 2xx with body — parses and returns the JSON dict.
 
         Args:
-            r: The raw httpx.Response from the FHIR Server.
+            r: The raw httpx.Response from fhir-server.
 
         Returns:
             Parsed JSON dict for successful responses with a body, or None for 204.
 
         Raises:
-            HTTPException: Forwarding the FHIR Server's status code and error detail
+            HTTPException: Forwarding fhir-server's status code and error detail
                 to the API consumer. This preserves semantic errors (e.g. 404 Not Found,
                 409 Conflict) without re-mapping them at this layer.
         """
@@ -94,9 +103,9 @@ class FhirClient:
     @staticmethod
     def _extract_detail(r: httpx.Response) -> str | list[dict]:
         """
-        Extract a client-facing error message from the FHIR Server's response body.
+        Extract a client-facing error message from fhir-server's response body.
 
-        The FHIR Server does not use a flat `{"detail": ...}` shape — every error
+        fhir-server does not use a flat `{"detail": ...}` shape — every error
         (validation, not-found, conflict, unhandled) is normalised by its own global
         handlers into a FHIR `OperationOutcome` resource, e.g.:
             {"resourceType": "OperationOutcome", "issue": [
@@ -112,7 +121,7 @@ class FhirClient:
         `expression`, produce a `list[dict]` of `{"field": ..., "message": ...}`
         entries — deliberately the same shape FastAPI's own `RequestValidationError`
         produces (see `validation_exception_handler` in app/main.py), so REST/GraphQL
-        consumers don't need a second branch for FHIR-Server-sourced 422s.
+        consumers don't need a second branch for fhir-server-sourced 422s.
         """
         try:
             body = r.json()
@@ -146,14 +155,14 @@ class FhirClient:
         inject_audit: bool = True,
     ) -> dict:
         """
-        Send a POST (create) request to the FHIR Server.
+        Send a POST (create) request to fhir-server.
 
-        Injects actor identity fields into the request body so the FHIR Server
+        Injects actor identity fields into the request body so fhir-server
         can record who created the resource without requiring callers to include
         those fields manually in every service call.
 
         Args:
-            path:         FHIR Server endpoint path relative to base_url (e.g. "/organizations").
+            path:         fhir-server endpoint path relative to base_url (e.g. "/organizations").
             data:         Resource payload from the schema's model_dump().
             actor:        Authenticated user performing the operation — `sub` stamps
                           `created_by` (unless inject_audit=False); `token` is forwarded
@@ -161,7 +170,7 @@ class FhirClient:
                           validate the caller's JWT themselves rather than trusting the
                           gateway unconditionally.
             accept:       Optional Accept header value forwarded from the client request.
-                          When set to "application/fhir+json", the FHIR Server returns the
+                          When set to "application/fhir+json", fhir-server returns the
                           resource in FHIR R4 format instead of plain JSON.
             inject_audit: When True (default), injects `created_by` from actor.sub.
                           Pass False for sub-resource endpoints whose input schemas use
@@ -174,7 +183,7 @@ class FhirClient:
         # Inject the audit field unless the caller opts out (e.g. sub-resource schemas
         # that use extra="forbid" and have no created_by field).
         body = {**data, "created_by": actor.sub} if inject_audit else data
-        # Forward the Accept header per-request so the FHIR Server applies content
+        # Forward the Accept header per-request so fhir-server applies content
         # negotiation. httpx merges per-request headers with client-level headers.
         extra_headers = {"Accept": accept} if accept else {}
         extra_headers["Authorization"] = f"Bearer {actor.token}"
@@ -190,13 +199,13 @@ class FhirClient:
         inject_audit: bool = True,
     ) -> dict:
         """
-        Send a PATCH (partial update) request to the FHIR Server.
+        Send a PATCH (partial update) request to fhir-server.
 
-        Injects `updated_by` so the FHIR Server can record who last modified the
+        Injects `updated_by` so fhir-server can record who last modified the
         resource without callers needing to supply it.
 
         Args:
-            path:         FHIR Server endpoint path including the resource ID.
+            path:         fhir-server endpoint path including the resource ID.
             data:         Partial payload from the schema's model_dump(exclude_none=True, mode="json").
             actor:        Authenticated user performing the operation — `token` is forwarded
                           as the Authorization header (see post()'s docstring for why).
@@ -223,26 +232,26 @@ class FhirClient:
         actor: AuthUser | None = None,
     ) -> dict:
         """
-        Send a GET request to the FHIR Server.
+        Send a GET request to fhir-server.
 
         No audit-field injection is needed for reads. `actor` is optional here
         (unlike post()/patch()) because most resources still don't validate a
-        JWT on the FHIR Server — pass it for resources (e.g. Patient) that do,
+        JWT on fhir-server — pass it for resources (e.g. Patient) that do,
         so the Authorization header is forwarded.
 
         Args:
-            path:   FHIR Server endpoint path (resource collection or specific resource).
+            path:   fhir-server endpoint path (resource collection or specific resource).
             params: Optional query parameters dict (e.g. {"name": "Acme", "limit": 10}).
             accept: Optional Accept header forwarded from the client request.
-                    When "application/fhir+json", the FHIR Server returns FHIR R4 format.
+                    When "application/fhir+json", fhir-server returns FHIR R4 format.
                     Omit (or pass None) for internal calls that always need plain JSON
                     (e.g. duplicate-detection pre-checks in the service layer).
             actor:  Authenticated caller — when provided, forwards `token` as the
-                    Authorization header. Optional; omit for resources the FHIR
-                    Server doesn't yet authenticate directly.
+                    Authorization header. Optional; omit for resources fhir-server
+                    doesn't yet authenticate directly.
 
         Returns:
-            The resource or paginated collection dict from the FHIR Server, in the
+            The resource or paginated collection dict from fhir-server, in the
             format determined by the `accept` value.
         """
         extra_headers = {"Accept": accept} if accept else {}
@@ -251,7 +260,7 @@ class FhirClient:
         # httpx stringifies query param values with str(), and a plain `str, Enum`
         # member's __str__ returns "ClassName.member_name" (not its actual value)
         # on Python < 3.11 — unwrap any Enum filter value (e.g. gender=AdministrativeGender.male)
-        # to its raw .value so the FHIR Server always receives "male", not "AdministrativeGender.male".
+        # to its raw .value so fhir-server always receives "male", not "AdministrativeGender.male".
         if params is not None:
             params = {
                 k: (v.value if isinstance(v, Enum) else v) for k, v in params.items()
@@ -261,13 +270,13 @@ class FhirClient:
 
     async def delete(self, path: str, actor: AuthUser | None = None) -> None:
         """
-        Send a DELETE request to the FHIR Server.
+        Send a DELETE request to fhir-server.
 
-        The FHIR Server returns 204 on success; _handle() converts that to None
+        fhir-server returns 204 on success; _handle() converts that to None
         which this method discards, so callers simply await without checking a return.
 
         Args:
-            path:  FHIR Server endpoint path including the resource ID to delete.
+            path:  fhir-server endpoint path including the resource ID to delete.
             actor: Authenticated caller — when provided, forwards `token` as the
                    Authorization header (see get()'s docstring for why this is optional).
         """

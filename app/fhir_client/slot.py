@@ -10,7 +10,7 @@ Reference: https://hl7.org/fhir/R4/slot.html
 """
 
 from app.auth.models import AuthUser
-from app.fhir_client.client import FhirClient
+from app.connectors.base import Connector
 from app.core.logging import trace_methods
 
 _PATH = "/slots"
@@ -26,7 +26,7 @@ class SlotClient:
     propagation.
     """
 
-    def __init__(self, fhir: FhirClient) -> None:
+    def __init__(self, fhir: Connector) -> None:
         """
         Args:
             fhir: The singleton FhirClient — owns the httpx session and base URL config.

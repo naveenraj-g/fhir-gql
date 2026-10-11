@@ -14,8 +14,8 @@ importing it directly.
 
 from dependency_injector import containers, providers
 
+from app.connectors.registry import CONNECTORS
 from app.core.config import settings
-from app.fhir_client.client import FhirClient
 from app.fhir_client.terminology import TerminologyClient
 
 
@@ -28,19 +28,36 @@ class CoreContainer(containers.DeclarativeContainer):
     containers) when they need connection-pool sharing.
     """
 
-    # Singleton provider for the downstream FHIR Server HTTP client.
-    # Singleton means dependency-injector constructs FhirClient exactly once on the
-    # first call and returns the same instance for every subsequent injection,
-    # preserving the httpx connection pool across requests.
-    fhir_client = providers.Singleton(
-        FhirClient,
-        base_url=settings.FHIR_SERVER_URL,  # target URL from environment config
+    # Singleton provider for the active connector (see app.connectors.base's
+    # Connector Protocol and app.connectors.registry) — the one thing every
+    # resource client (OrganizationClient, etc.) and service actually
+    # depends on for I/O, named `fhir_client` for backward compatibility
+    # with every existing `core.fhir_client` reference across the domain
+    # containers below.
+    #
+    # providers.Selector picks the named branch matching
+    # settings.connectors.active and constructs ONLY that one (the other
+    # branches are never instantiated) — exactly the "config picks which
+    # system to connect to" mechanism this is for. Each branch is itself a
+    # Singleton, so dependency-injector still constructs it exactly once
+    # and preserves its connection pool across requests. Adding a second
+    # connector means adding another `providers.Singleton(...)` branch
+    # here, keyed by that connector's registry name — nothing else in this
+    # file changes.
+    fhir_client = providers.Selector(
+        lambda: settings.connectors.active,
+        fhir_server=providers.Singleton(
+            CONNECTORS["fhir_server"],
+            base_url=settings.FHIR_SERVER_URL,
+        ),
     )
 
     # Singleton provider for the Terminology HTTP client.
     # Terminology lives at a different base URL (/api/v1/terminology) from FHIR
     # resources (/api/fhir/v1), so it needs its own httpx client. Singleton keeps
-    # the connection pool shared across all terminology requests.
+    # the connection pool shared across all terminology requests. Not part of
+    # the connector abstraction above — terminology is a fhir-server-specific
+    # feature, not something every backend necessarily exposes the same way.
     terminology_client = providers.Singleton(
         TerminologyClient,
         base_url=settings.TERMINOLOGY_SERVER_URL,

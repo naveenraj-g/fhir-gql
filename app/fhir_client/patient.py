@@ -25,7 +25,7 @@ Reference: https://hl7.org/fhir/R4/patient.html
 """
 
 from app.auth.models import AuthUser
-from app.fhir_client.client import FhirClient
+from app.connectors.base import Connector
 from app.core.logging import trace_methods
 
 # Base path for all Patient endpoints on the fhir-server.
@@ -43,7 +43,7 @@ class PatientClient:
     the caller can request plain JSON or FHIR R4 format.
     """
 
-    def __init__(self, fhir: FhirClient) -> None:
+    def __init__(self, fhir: Connector) -> None:
         """
         Initialise with a shared FhirClient injected by the DI container.
 

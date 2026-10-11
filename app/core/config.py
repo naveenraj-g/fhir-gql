@@ -7,10 +7,11 @@ mirrors fhir-server's own app/core/config.py precedence and split:
      Server/terminology service/IAM live, and the Redis connection string.
      These vary by deployment and are never committed with real values.
   3. `configs/config.yaml` — checked-in, non-secret application *behavior*:
-     CORS, the Redis on/off switch, rate limits, logging, and FastAPI app
-     metadata. Same spirit as fhir-server's configs/config.yaml — not a
-     secret, safe to commit, and the thing an operator actually hand-edits
-     to change how the app behaves without touching code.
+     which connector is active, CORS, the Redis on/off switch, rate limits,
+     logging, and FastAPI app metadata. Same spirit as fhir-server's
+     configs/config.yaml — not a secret, safe to commit, and the thing an
+     operator actually hand-edits to change how the app behaves without
+     touching code.
   4. Field defaults (lowest precedence) — defined on the models below.
 
 Deliberately NOT brought over from fhir-server: a `routes:`-style config for
@@ -43,6 +44,24 @@ class AppConfig(BaseModel):
     # Gates only the interactive /docs (Swagger) and /redoc UIs. /openapi.json
     # itself stays reachable regardless of this setting.
     docs_enabled: bool = True
+
+
+class ConnectorsConfig(BaseModel):
+    """Selects which backend system this gateway's resource clients and
+    services talk to — see app.connectors.base.Connector (the interface)
+    and app.connectors.registry (the name -> implementation mapping this
+    `active` value is looked up in).
+
+    Every resource client (app/fhir_client/*.py) and service is written
+    against the Connector Protocol, never against a specific backend —
+    `active` is the only thing that decides which concrete system is live.
+    "fhir_server" (this application, see app.connectors.fhir_server) is
+    the only connector today; adding another (e.g. Medplum, or any other
+    FHIR-R4-shaped EMR/EHR) means writing a class satisfying the Protocol,
+    registering it in app.connectors.registry.CONNECTORS, and extending
+    the Literal below to match — then `active` can be flipped to it."""
+
+    active: Literal["fhir_server"] = "fhir_server"
 
 
 class CorsConfig(BaseModel):
@@ -152,6 +171,7 @@ class Settings(BaseSettings):
     REDIS_URL: str = "redis://localhost:6379/0"
 
     app: AppConfig = Field(default_factory=AppConfig)
+    connectors: ConnectorsConfig = Field(default_factory=ConnectorsConfig)
     cors: CorsConfig = Field(default_factory=CorsConfig)
     redis: RedisConfig = Field(default_factory=RedisConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)

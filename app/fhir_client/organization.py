@@ -27,7 +27,7 @@ Reference: https://hl7.org/fhir/R4/organization.html
 """
 
 from app.auth.models import AuthUser
-from app.fhir_client.client import FhirClient
+from app.connectors.base import Connector
 from app.core.logging import trace_methods
 
 # Base path for all Organization endpoints on the fhir-server.
@@ -46,7 +46,7 @@ class OrganizationClient:
     format.
     """
 
-    def __init__(self, fhir: FhirClient) -> None:
+    def __init__(self, fhir: Connector) -> None:
         """
         Args:
             fhir: The singleton FhirClient — owns the httpx session and base URL config.
