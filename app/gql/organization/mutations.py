@@ -1,9 +1,14 @@
+from typing import Annotated
+
 import strawberry
 
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
-from app.gql.organization.types.input import OrganizationCreateInput, OrganizationPatchInput
-from app.gql.organization.types.types import OrganizationType
+from app.gql.organization.types.input import (
+    OrganizationCreateInput,
+    OrganizationPatchInput,
+)
+from app.gql.organization.types.response import OrganizationType
 from app.gql.permissions import require_gql_permission
 from app.schemas.organization.response import OrganizationResponse
 
@@ -30,7 +35,14 @@ class OrganizationMutation:
     )
     @translate_errors
     async def create_organization(
-        self, info: strawberry.types.Info, input: OrganizationCreateInput
+        self,
+        info: strawberry.types.Info,
+        input: Annotated[
+            OrganizationCreateInput,
+            strawberry.argument(
+                description="The Organization (and any sub-resources) to create."
+            ),
+        ],
     ) -> OrganizationType:
         """Create a new Organization — mirrors POST /organizations/."""
         actor = require_gql_permission(info, "organization", "create")
@@ -52,7 +64,15 @@ class OrganizationMutation:
     )
     @translate_errors
     async def update_organization(
-        self, info: strawberry.types.Info, organization_id: int, input: OrganizationPatchInput
+        self,
+        info: strawberry.types.Info,
+        organization_id: Annotated[
+            int, strawberry.argument(description="Public organization identifier.")
+        ],
+        input: Annotated[
+            OrganizationPatchInput,
+            strawberry.argument(description="Fields to update — only these are written."),
+        ],
     ) -> OrganizationType:
         """Partially update an Organization — mirrors PATCH /organizations/{id}."""
         actor = require_gql_permission(info, "organization", "update")
@@ -71,7 +91,11 @@ class OrganizationMutation:
     )
     @translate_errors
     async def delete_organization(
-        self, info: strawberry.types.Info, organization_id: int
+        self,
+        info: strawberry.types.Info,
+        organization_id: Annotated[
+            int, strawberry.argument(description="Public organization identifier.")
+        ],
     ) -> bool:
         """Delete an Organization and its child records — mirrors DELETE /organizations/{id}. Returns true on success."""
         actor = require_gql_permission(info, "organization", "delete")

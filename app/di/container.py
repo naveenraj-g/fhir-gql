@@ -21,18 +21,12 @@ Container hierarchy:
     ├── core              →  CoreContainer          (shared infrastructure: FHIR HTTP client)
     ├── patient           →  PatientContainer       (Patient CRUD + 9 sub-resource clients)
     ├── organization      →  OrganizationContainer  (Organization CRUD)
-    ├── location          →  LocationContainer      (Location CRUD; also depends on `organization`
-    │                                                 for managing_organization reference validation)
-    ├── healthcare_service →  HealthcareServiceContainer (HealthcareService CRUD; also depends on
-    │                                            `organization` and `location` for provided_by/
-    │                                            location/coverage_area reference validation)
+    ├── location          →  LocationContainer      (Location CRUD)
+    ├── healthcare_service →  HealthcareServiceContainer (HealthcareService CRUD)
     ├── practitioner       →  PractitionerContainer (Practitioner CRUD + 7 sub-resource clients;
     │                                            also depends on `organization` for
     │                                            qualification.issuer reference validation)
-    ├── practitioner_role  →  PractitionerRoleContainer (PractitionerRole CRUD; depends on
-    │                                            `practitioner`, `organization`, `location`, and
-    │                                            `healthcare_service` for its four cross-resource
-    │                                            reference validations)
+    ├── practitioner_role  →  PractitionerRoleContainer (PractitionerRole CRUD)
     ├── schedule           →  ScheduleContainer (Schedule CRUD; depends on `practitioner`,
     │                                            `practitioner_role`, `location`,
     │                                            `healthcare_service`, and `patient` to validate
@@ -45,9 +39,7 @@ Additional resources (encounter, ...) can be added the same way Patient,
 Organization, Location, HealthcareService, Practitioner, PractitionerRole,
 Schedule, and Slot were: a new app/di/modules/<resource>.py container,
 wired here with `core=core` (plus any sibling sub-container it needs
-directly, as Location needs `organization`, HealthcareService needs both
-`organization` and `location`, Practitioner needs `organization`,
-PractitionerRole needs `practitioner`+`organization`+`location`+`healthcare_service`,
+directly, as Practitioner needs `organization`,
 Schedule needs `practitioner`+`practitioner_role`+`location`+`healthcare_service`+`patient`,
 and Slot needs `schedule`+`practitioner_role`), then added to
 app/routers/__init__.py and app/gql/schema.py.
@@ -101,26 +93,23 @@ class Container(containers.DeclarativeContainer):
         core=core,
     )
 
-    # Domain container for Location resources. Must be declared after
-    # `organization` above since it references that provider by name —
-    # LocationService validates managing_organization references via
-    # OrganizationClient (see app/di/modules/location.py).
+    # Domain container for Location resources. No longer depends on
+    # `organization` — managing_organization/part_of validation now lives
+    # entirely on fhir-server (see app/di/modules/location.py).
     location = providers.Container(
         LocationContainer,
         core=core,
-        organization=organization,
     )
 
-    # Domain container for HealthcareService resources. Must be declared
-    # after both `organization` and `location` above since it references
-    # both providers by name — HealthcareServiceService validates
-    # provided_by (Organization) and location/coverage_area (Location)
-    # references (see app/di/modules/healthcare_service.py).
+    # Domain container for HealthcareService resources. No longer depends on
+    # `organization`/`location` — provided_by/location/coverage_area
+    # validation now lives entirely on fhir-server (see
+    # app/di/modules/healthcare_service.py). Kept declared in this position
+    # (after `location`) since PractitionerRoleContainer/ScheduleContainer
+    # below still reference `healthcare_service` as a sibling provider.
     healthcare_service = providers.Container(
         HealthcareServiceContainer,
         core=core,
-        organization=organization,
-        location=location,
     )
 
     # Domain container for Practitioner resources. Must be declared after
@@ -133,19 +122,16 @@ class Container(containers.DeclarativeContainer):
         organization=organization,
     )
 
-    # Domain container for PractitionerRole resources. Must be declared
-    # after `practitioner`, `organization`, `location`, and
-    # `healthcare_service` above since it references all four providers by
-    # name — PractitionerRoleService validates practitioner/organization/
-    # location/healthcare_service references (see
-    # app/di/modules/practitioner_role.py).
+    # Domain container for PractitionerRole resources. No longer depends on
+    # `practitioner`/`organization`/`location`/`healthcare_service` —
+    # practitioner/organization/location[]/healthcare_service[] reference
+    # validation now lives entirely on fhir-server (see
+    # app/di/modules/practitioner_role.py). Kept declared in this position
+    # (after `practitioner`) since ScheduleContainer/SlotContainer below
+    # still reference `practitioner_role` as a sibling provider.
     practitioner_role = providers.Container(
         PractitionerRoleContainer,
         core=core,
-        practitioner=practitioner,
-        organization=organization,
-        location=location,
-        healthcare_service=healthcare_service,
     )
 
     # Domain container for Schedule resources. Must be declared last —

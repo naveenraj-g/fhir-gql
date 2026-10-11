@@ -1,22 +1,21 @@
 """
 Business logic service for the Location resource.
 
-LocationService sits between the router/resolvers and LocationClient. It owns:
-  - `part_of` (parent Location) validation — existence, tenant match, and
-    cycle prevention. Unlike Organization's `partof` (create-only,
-    immutable), Location's `part_of` is patchable, so re-parenting is a real
-    operation that must be re-validated on every change, not just create.
-  - `managing_organization` validation — existence + tenant match. This is
-    the one place LocationService reaches into a different resource
-    domain's client (OrganizationClient) — a small, direct dependency for a
-    single reference check, not the app/workflows/ orchestration tier (see
-    dev-docs/13-workflow-orchestration.md; that tier is reserved for genuine
-    multi-resource workflows like Appointment booking).
-  - Empty-patch rejection (422 if the caller sends an empty PATCH body).
-  - Tenant-ownership enforcement on by-id operations: get_by_id/update/delete
-    fetch the resource first and 404 if its org_id doesn't match the
-    caller's, via the shared app.services.tenant_scope.check_tenant_ownership
-    helper (also used by OrganizationsService).
+LocationService sits between the router/resolvers and LocationClient. It is
+a thin pass-through — same shape as OrganizationsService — because
+fhir-server now owns every rule that used to live here:
+  - `part_of` (parent Location) existence/tenant-match/circular-hierarchy
+    validation, and `managing_organization` existence/tenant-match
+    validation (previously done client-side against OrganizationClient) are
+    gone. fhir-server's own repository-level validation is authoritative —
+    see app/repository/location/full.py on fhir-server, which raises a 404
+    on a missing/cross-tenant reference and a 409 on a circular hierarchy —
+    pre-checking here only risked disagreeing with the server.
+  - The old "fetch unauthenticated, check_tenant_ownership client-side, then
+    refetch" dance on get_by_id/update/delete is gone too — fhir-server's
+    `get_location_scoped()` already 404s a cross-org access server-side once
+    the caller's JWT is forwarded (see LocationClient), so each of those is
+    now a single client call.
 
 The service does NOT inject created_by/updated_by — FhirClient does that
 automatically from actor.sub on every POST and PATCH.
@@ -25,21 +24,12 @@ automatically from actor.sub on every POST and PATCH.
 from fastapi import HTTPException, status
 
 from app.auth.models import AuthUser
-from app.core.resource_config import resource_config
 from app.fhir_client.location import LocationClient
-from app.fhir_client.organization import OrganizationClient
 from app.schemas.location.input import (
     ListLocationsSchema,
     LocationCreateSchema,
     LocationPatchSchema,
 )
-from app.services.tenant_scope import check_tenant_ownership, validate_reference
-
-# Bounded depth for the part_of ancestor-chain walk in _check_no_cycle — guards
-# against looping forever if the fhir-server ever contains a pre-existing
-# cycle from outside this service's control. Sourced from config/resources.json
-# (see app.core.resource_config) rather than hardcoded here.
-_MAX_HIERARCHY_DEPTH = resource_config.location.max_hierarchy_depth
 
 
 class LocationService:
@@ -50,144 +40,34 @@ class LocationService:
     Factory provider, so it holds no shared state between requests.
     """
 
-    def __init__(
-        self, client: LocationClient, organization_client: OrganizationClient
-    ) -> None:
+    def __init__(self, client: LocationClient) -> None:
         """
         Args:
-            client:              The LocationClient injected by the DI container.
-            organization_client: OrganizationClient, injected purely to validate
-                                  `managing_organization` references — see class docstring.
+            client: The LocationClient injected by the DI container.
+                    Provides fhir-server access for all Location operations.
         """
         self._client = client
-        self._org_client = organization_client
-
-    async def _validate_part_of(
-        self, part_of: str, actor: AuthUser, *, location_id: int | None = None
-    ) -> None:
-        """
-        Verify a `part_of` parent-Location reference.
-
-        Always checks the reference is well-formed, the parent exists, and
-        belongs to the caller's tenant (delegated to the shared
-        `validate_reference` helper). When `location_id` is given (i.e. this
-        is an update, not a create — a brand-new Location has no id yet and
-        so cannot be part of a cycle), also walks the parent's ancestor
-        chain to reject re-parenting that would introduce a circular
-        hierarchy.
-
-        Args:
-            part_of:     Raw FHIR reference string, e.g. "Location/230001".
-            actor:       Authenticated caller — the parent's org_id must match.
-            location_id: The Location being created/updated, if this is an
-                         update (None on create, since cycles are impossible then).
-
-        Raises:
-            HTTPException(422): If `part_of` is malformed, or would make the
-                Location its own parent.
-            HTTPException(404): If the parent doesn't exist, or belongs to a different tenant.
-            HTTPException(409): If re-parenting would create a circular hierarchy.
-        """
-        parent = await validate_reference(
-            part_of,
-            resource_type="Location",
-            get_by_id=self._client.get_by_id,
-            actor=actor,
-            field_name="part_of",
-        )
-
-        if location_id is not None:
-            await self._check_no_cycle(location_id, parent["id"])
-
-    async def _check_no_cycle(self, location_id: int, new_parent_id: int) -> None:
-        """
-        Walk `new_parent_id`'s ancestor chain to ensure re-parenting
-        `location_id` under it would not create a cycle.
-
-        Bounded to `_MAX_HIERARCHY_DEPTH` hops so a pre-existing cycle in
-        fhir-server data (outside this request's control) can't hang the
-        request forever — such data is a separate, pre-existing problem this
-        check isn't responsible for catching.
-
-        Args:
-            location_id:    The Location being re-parented.
-            new_parent_id:  The proposed new `part_of` target.
-
-        Raises:
-            HTTPException(422): If `new_parent_id == location_id` (self-reference).
-            HTTPException(409): If `location_id` appears anywhere in the new
-                parent's existing ancestor chain.
-        """
-        if new_parent_id == location_id:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail="A Location cannot be its own part_of parent.",
-            )
-
-        current_id = new_parent_id
-        seen: set[int] = set()
-        for _ in range(_MAX_HIERARCHY_DEPTH):
-            if current_id in seen:
-                return  # pre-existing cycle elsewhere in the data — not this request's fault
-            seen.add(current_id)
-
-            node = await self._client.get_by_id(current_id)
-            raw_parent_id = node.get("part_of_id")
-            if raw_parent_id is None:
-                return  # chain terminates without ever reaching location_id — safe
-
-            next_id = int(raw_parent_id)
-            if next_id == location_id:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This would create a circular Location hierarchy.",
-                )
-            current_id = next_id
-
-    async def _validate_managing_organization(self, ref: str, actor: AuthUser) -> None:
-        """
-        Verify a `managing_organization` reference before allowing it to be set.
-
-        Args:
-            ref:   Raw FHIR reference string, e.g. "Organization/190001".
-            actor: Authenticated caller — the organization's org_id must match.
-
-        Raises:
-            HTTPException(422): If `ref` is not a well-formed "Organization/<id>" reference.
-            HTTPException(404): If the organization doesn't exist, or belongs to a different tenant.
-        """
-        await validate_reference(
-            ref,
-            resource_type="Organization",
-            get_by_id=self._org_client.get_by_id,
-            actor=actor,
-            field_name="managing_organization",
-        )
 
     async def create(
         self, dto: LocationCreateSchema, actor: AuthUser, accept: str | None = None
     ) -> dict:
         """
-        Create a new Location resource, validating `part_of` and
-        `managing_organization` references when provided.
+        Create a new Location resource on the fhir-server.
+
+        fhir-server validates `part_of` (existence, tenant match, and the
+        circular-hierarchy business rule) and `managing_organization`
+        (existence, tenant match) server-side and returns 404/409/422 —
+        this method does not re-implement any of that.
 
         Args:
-            dto:    Validated creation payload from the request body.
-            actor:  Authenticated user performing the creation.
+            dto:    Validated create input from the resolver/router.
+            actor:  Authenticated caller — used by FhirClient for created_by
+                    and forwarded as the Authorization header.
             accept: Content-type preference forwarded to the fhir-server.
 
         Returns:
             The newly created Location resource dict (plain JSON or FHIR R4).
-
-        Raises:
-            HTTPException(422): If `part_of`/`managing_organization` are malformed.
-            HTTPException(404): If either references a non-existent or cross-tenant resource.
         """
-        if dto.part_of is not None:
-            await self._validate_part_of(dto.part_of, actor)
-        if dto.managing_organization is not None:
-            await self._validate_managing_organization(dto.managing_organization, actor)
-
         payload = dto.model_dump(exclude_none=True, mode="json")
         return await self._client.create(payload, actor, accept=accept)
 
@@ -195,34 +75,68 @@ class LocationService:
         self, location_id: int, actor: AuthUser, accept: str | None = None
     ) -> dict:
         """
-        Fetch a single Location by its numeric ID, scoped to the caller's org.
+        Fetch a single Location by its integer ID.
 
-        Always fetches plain JSON first to check tenant ownership (FHIR R4
-        responses omit org_id).
+        fhir-server scopes this to the caller's own org via the verified JWT
+        (get_location_scoped()) and 404s a cross-org access itself — no
+        client-side ownership check needed here.
 
-        Raises:
-            HTTPException(404): If not found, or found but owned by a different org.
+        Args:
+            location_id: The integer primary key of the Location.
+            actor:       Authenticated caller — forwarded as the Authorization header.
+            accept:      Content-type preference forwarded to the fhir-server.
+
+        Returns:
+            The Location resource dict in the requested format.
         """
-        internal = await self._client.get_by_id(location_id)
-        check_tenant_ownership(internal, actor, not_found_detail="Location not found.")
-        if accept is None:
-            return internal
-        return await self._client.get_by_id(location_id, accept=accept)
+        return await self._client.get_by_id(location_id, actor, accept=accept)
 
     async def list(
         self, filters: ListLocationsSchema, actor: AuthUser, accept: str | None = None
     ) -> dict:
         """
-        Return a paginated, optionally filtered list of Location resources.
+        Return a paginated, filtered list of Location resources.
 
-        No ownership check here — matches OrganizationsService.list().
+        org_id is never forwarded as a filter — fhir-server always scopes
+        Location reads to the caller's own org via the verified JWT.
+
+        Args:
+            filters: Validated query parameters from the resolver/router.
+            actor:   Authenticated caller — forwarded as the Authorization header.
+            accept:  Content-type preference — FHIR R4 wraps results in a Bundle.
+
+        Returns:
+            Paginated plain JSON dict or FHIR Bundle depending on `accept`.
         """
         return await self._client.list(
+            actor,
             accept=accept,
-            org_id=filters.org_id,
-            status=filters.status,
+            name=filters.name,
+            identifier=filters.identifier,
+            organization=filters.organization,
+            partof=filters.partof,
+            endpoint=filters.endpoint,
+            near=filters.near,
+            sort=filters.sort,
+            total_mode=filters.total_mode,
             limit=filters.limit,
             offset=filters.offset,
+            # Query-string names below diverge from the Python field names
+            # they come from (fhir-server's router aliases them, e.g.
+            # `status` for location_status) — passed as a merged dict since
+            # they aren't valid Python keyword-argument names on their own.
+            **{
+                "status": filters.location_status,
+                "operational-status": filters.operational_status,
+                "type": filters.location_type,
+                "physical-type": filters.physical_type,
+                "address-city": filters.address_city,
+                "address-state": filters.address_state,
+                "address-postalcode": filters.address_postal_code,
+                "address-country": filters.address_country,
+                "address-use": filters.address_use,
+            },
+            address=filters.address,
         )
 
     async def update(
@@ -233,26 +147,25 @@ class LocationService:
         accept: str | None = None,
     ) -> dict:
         """
-        Partially update a Location resource, scoped to the caller's org.
+        Partially update a Location resource.
 
-        Re-validates `part_of` (existence + tenant + cycle) and
-        `managing_organization` (existence + tenant) whenever the caller
-        includes them in the patch payload — re-parenting is a supported
-        operation on Location, unlike Organization's immutable `partof`.
+        fhir-server scopes this to the caller's own org (404 on mismatch)
+        and validates `part_of`/`managing_organization` (existence, tenant
+        match, circular-hierarchy check for `part_of`) server-side.
+
+        Args:
+            location_id: The integer primary key of the Location to update.
+            dto:         Validated partial payload; all fields Optional.
+            actor:       Authenticated user — used by FhirClient for updated_by
+                         and forwarded as the Authorization header.
+            accept:      Content-type preference forwarded to the fhir-server.
+
+        Returns:
+            The updated Location resource dict in the requested format.
 
         Raises:
-            HTTPException(404): If not found, or found but owned by a different org.
-            HTTPException(409): If re-parenting would create a circular hierarchy.
             HTTPException(422): If the request body contained no updateable fields.
         """
-        internal = await self._client.get_by_id(location_id)
-        check_tenant_ownership(internal, actor, not_found_detail="Location not found.")
-
-        if dto.part_of is not None:
-            await self._validate_part_of(dto.part_of, actor, location_id=location_id)
-        if dto.managing_organization is not None:
-            await self._validate_managing_organization(dto.managing_organization, actor)
-
         payload = dto.model_dump(exclude_none=True, mode="json")
         if not payload:
             raise HTTPException(
@@ -263,11 +176,13 @@ class LocationService:
 
     async def delete(self, location_id: int, actor: AuthUser) -> None:
         """
-        Delete a Location resource, scoped to the caller's org.
+        Delete a Location resource.
 
-        Raises:
-            HTTPException(404): If not found, or found but owned by a different org.
+        fhir-server scopes this to the caller's own org (404 on mismatch)
+        server-side — no client-side ownership check needed here.
+
+        Args:
+            location_id: The integer primary key of the Location to delete.
+            actor:       Authenticated user — forwarded as the Authorization header.
         """
-        internal = await self._client.get_by_id(location_id)
-        check_tenant_ownership(internal, actor, not_found_detail="Location not found.")
-        await self._client.delete(location_id)
+        await self._client.delete(location_id, actor)

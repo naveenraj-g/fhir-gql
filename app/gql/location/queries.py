@@ -1,11 +1,13 @@
-from typing import Optional
+from typing import Annotated
 
 import strawberry
 
+from app.gql.common.pagination import LimitArg, OffsetArg, SortArg, TotalModeArg
 from app.gql.context import get_container
-from app.gql.enums import LocationStatusEnum
+from app.gql.enums import TotalModeEnum
 from app.gql.errors import translate_errors
-from app.gql.location.types.types import LocationType, PaginatedLocationType
+from app.gql.location.types.filter import LocationFilterInput
+from app.gql.location.types.response import LocationType, PaginatedLocationType
 from app.gql.permissions import require_gql_permission
 from app.schemas.location.input import ListLocationsSchema
 from app.schemas.location.response import LocationResponse, PaginatedLocationResponse
@@ -32,7 +34,11 @@ class LocationQuery:
     )
     @translate_errors
     async def location(
-        self, info: strawberry.types.Info, location_id: int
+        self,
+        info: strawberry.types.Info,
+        location_id: Annotated[
+            int, strawberry.argument(description="Public location identifier.")
+        ],
     ) -> LocationType:
         """Fetch a single Location by its integer ID — mirrors GET /locations/{id}."""
         actor = require_gql_permission(info, "location", "read")
@@ -42,25 +48,57 @@ class LocationQuery:
 
     @strawberry.field(
         description=(
-            "List Locations, optionally filtered by `orgId` (tenant scoping) and `status`, "
-            "with `limit`/`offset` pagination (default limit 20, max 200). Requires the "
-            "`location:read` permission."
+            "List Locations, optionally narrowed by `filters` (name, identifier, "
+            "status, operationalStatus, locationType, physicalType, address sub-fields, "
+            "organization/partof/endpoint references, near — see LocationFilterInput), "
+            "with `sort` (e.g. `-name`), `totalMode` (`accurate`|`none`), and "
+            "`limit`/`offset` pagination (default limit 50, max 200). `orgId` is not a "
+            "filter — Location reads are always scoped to the caller's own org via "
+            "their JWT. Requires the `location:read` permission."
         )
     )
     @translate_errors
     async def locations(
         self,
         info: strawberry.types.Info,
-        org_id: Optional[str] = None,
-        status: Optional[LocationStatusEnum] = None,
-        limit: int = 20,
-        offset: int = 0,
+        filters: Annotated[
+            LocationFilterInput | None,
+            strawberry.argument(
+                description="Search parameters to narrow the Location list — see LocationFilterInput."
+            ),
+        ] = None,
+        sort: SortArg = None,
+        total_mode: TotalModeArg = TotalModeEnum.accurate,
+        limit: LimitArg = 50,
+        offset: OffsetArg = 0,
     ) -> PaginatedLocationType:
         """List Locations with optional filters — mirrors GET /locations/."""
         actor = require_gql_permission(info, "location", "read")
         service = get_container(info).location.location_service()
-        filters = ListLocationsSchema(
-            org_id=org_id, status=status, limit=limit, offset=offset
+        # Default to an all-None filter set when the caller omits `filters` entirely —
+        # keeps the ListLocationsSchema construction below uniform either way.
+        f = filters or LocationFilterInput()
+        list_filters = ListLocationsSchema(
+            name=f.name,
+            identifier=f.identifier,
+            location_status=f.location_status,
+            operational_status=f.operational_status,
+            location_type=f.location_type,
+            physical_type=f.physical_type,
+            address=f.address,
+            address_city=f.address_city,
+            address_state=f.address_state,
+            address_postal_code=f.address_postal_code,
+            address_country=f.address_country,
+            address_use=f.address_use,
+            organization=f.organization,
+            partof=f.partof,
+            endpoint=f.endpoint,
+            near=f.near,
+            sort=sort,
+            total_mode=total_mode,
+            limit=limit,
+            offset=offset,
         )
-        data = await service.list(filters, actor)
+        data = await service.list(list_filters, actor)
         return _to_paginated_location_type(data)

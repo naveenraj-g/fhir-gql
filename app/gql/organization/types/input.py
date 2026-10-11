@@ -1,8 +1,8 @@
 """
 GraphQL input types for the Organization resource, derived from the
-Pydantic schemas in app/schemas/organization/input.py via
+Pydantic schemas in the app/schemas/organization/input/ package via
 `strawberry.experimental.pydantic`. Output types live in
-app/gql/organization/types/types.py.
+app/gql/organization/types/response.py.
 
 Naming convention:
   - `<X>Schema` (Pydantic) -> `<X>Input` (GraphQL input type)
@@ -24,10 +24,6 @@ import strawberry
 # import) — required before wrapping any input schema whose fields use them.
 import app.gql.enums  # noqa: F401
 from app.schemas.organization.input import (
-    OrganizationCreateSchema,
-    OrganizationPatchSchema,
-)
-from app.schemas.organization.input import (
     OrganizationAddressInput as OrganizationAddressInputSchema,
 )
 from app.schemas.organization.input import (
@@ -38,6 +34,10 @@ from app.schemas.organization.input import (
 )
 from app.schemas.organization.input import (
     OrganizationContactTelecomInput as OrganizationContactTelecomInputSchema,
+)
+from app.schemas.organization.input import (
+    OrganizationCreateSchema,
+    OrganizationPatchSchema,
 )
 from app.schemas.organization.input import (
     OrganizationEndpointInput as OrganizationEndpointInputSchema,
@@ -160,14 +160,14 @@ class OrganizationPatchInput:
 # See app/gql/organization/queries.py, which imports it directly from
 # app.schemas.organization.input.
 __all__ = [
-    "OrganizationIdentifierInput",
-    "OrganizationTypeInput",
-    "OrganizationAliasInput",
-    "OrganizationTelecomInput",
     "OrganizationAddressInput",
-    "OrganizationContactTelecomInput",
+    "OrganizationAliasInput",
     "OrganizationContactInput",
-    "OrganizationEndpointInput",
+    "OrganizationContactTelecomInput",
     "OrganizationCreateInput",
+    "OrganizationEndpointInput",
+    "OrganizationIdentifierInput",
     "OrganizationPatchInput",
+    "OrganizationTelecomInput",
+    "OrganizationTypeInput",
 ]

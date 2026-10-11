@@ -1,14 +1,22 @@
-from typing import Optional
+from typing import Annotated
 
 import strawberry
 
+from app.gql.common.pagination import LimitArg, OffsetArg, SortArg, TotalModeArg
 from app.gql.context import get_container
-from app.gql.enums import AddressUseEnum
+from app.gql.enums import TotalModeEnum
 from app.gql.errors import translate_errors
-from app.gql.organization.types.types import OrganizationType, PaginatedOrganizationType
+from app.gql.organization.types.filter import OrganizationFilterInput
+from app.gql.organization.types.response import (
+    OrganizationType,
+    PaginatedOrganizationType,
+)
 from app.gql.permissions import require_gql_permission
 from app.schemas.organization.input import ListOrganizationsSchema
-from app.schemas.organization.response import OrganizationResponse, PaginatedOrganizationResponse
+from app.schemas.organization.response import (
+    OrganizationResponse,
+    PaginatedOrganizationResponse,
+)
 
 
 def _to_org_type(data: dict) -> OrganizationType:
@@ -32,7 +40,11 @@ class OrganizationQuery:
     )
     @translate_errors
     async def organization(
-        self, info: strawberry.types.Info, organization_id: int
+        self,
+        info: strawberry.types.Info,
+        organization_id: Annotated[
+            int, strawberry.argument(description="Public organization identifier.")
+        ],
     ) -> OrganizationType:
         """Fetch a single Organization by its integer ID — mirrors GET /organizations/{id}."""
         actor = require_gql_permission(info, "organization", "read")
@@ -42,59 +54,53 @@ class OrganizationQuery:
 
     @strawberry.field(
         description=(
-            "List Organizations, optionally filtered by `name` (matches name or any alias, "
-            "partial case-insensitive), `identifier` (exact business-identifier value), "
-            "`orgType` (exact coded organization type — FHIR `type`), `active`, "
-            "`address`/`addressCity`/`addressState`/"
-            "`addressPostalCode`/`addressCountry`/`addressUse`, `partof`/`endpoint` (FHIR "
-            "reference strings, e.g. `Organization/190001`), with `sort` (e.g. "
-            "`-name`), `totalMode` (`accurate`|`none`), and `limit`/`offset` pagination "
-            "(default limit 50, max 200). `orgId` is not a filter — Organization reads are "
-            "always scoped to the caller's own org via their JWT. Requires the "
-            "`organization:read` permission."
+            "List Organizations, optionally narrowed by `filters` (name, identifier, "
+            "orgType, active, address sub-fields, partof/endpoint references — see "
+            "OrganizationFilterInput), with `sort` (e.g. `-name`), `totalMode` "
+            "(`accurate`|`none`), and `limit`/`offset` pagination (default limit 50, "
+            "max 200). `orgId` is not a filter — Organization reads are always scoped "
+            "to the caller's own org via their JWT. Requires the `organization:read` "
+            "permission."
         )
     )
     @translate_errors
     async def organizations(
         self,
         info: strawberry.types.Info,
-        name: Optional[str] = None,
-        active: Optional[bool] = None,
-        identifier: Optional[str] = None,
-        org_type: Optional[str] = None,
-        address: Optional[str] = None,
-        address_city: Optional[str] = None,
-        address_state: Optional[str] = None,
-        address_postal_code: Optional[str] = None,
-        address_country: Optional[str] = None,
-        address_use: Optional[AddressUseEnum] = None,
-        partof: Optional[str] = None,
-        endpoint: Optional[str] = None,
-        sort: Optional[str] = None,
-        total_mode: str = "accurate",
-        limit: int = 50,
-        offset: int = 0,
+        filters: Annotated[
+            OrganizationFilterInput | None,
+            strawberry.argument(
+                description="Search parameters to narrow the Organization list — see OrganizationFilterInput."
+            ),
+        ] = None,
+        sort: SortArg = None,
+        total_mode: TotalModeArg = TotalModeEnum.accurate,
+        limit: LimitArg = 50,
+        offset: OffsetArg = 0,
     ) -> PaginatedOrganizationType:
         """List Organizations with optional filters — mirrors GET /organizations/."""
         actor = require_gql_permission(info, "organization", "read")
         service = get_container(info).organization.organization_service()
-        filters = ListOrganizationsSchema(
-            name=name,
-            active=active,
-            identifier=identifier,
-            org_type=org_type,
-            address=address,
-            address_city=address_city,
-            address_state=address_state,
-            address_postal_code=address_postal_code,
-            address_country=address_country,
-            address_use=address_use,
-            partof=partof,
-            endpoint=endpoint,
+        # Default to an all-None filter set when the caller omits `filters` entirely —
+        # keeps the ListOrganizationsSchema construction below uniform either way.
+        f = filters or OrganizationFilterInput()
+        list_filters = ListOrganizationsSchema(
+            name=f.name,
+            active=f.active,
+            identifier=f.identifier,
+            org_type=f.org_type,
+            address=f.address,
+            address_city=f.address_city,
+            address_state=f.address_state,
+            address_postal_code=f.address_postal_code,
+            address_country=f.address_country,
+            address_use=f.address_use,
+            partof=f.partof,
+            endpoint=f.endpoint,
             sort=sort,
             total_mode=total_mode,
             limit=limit,
             offset=offset,
         )
-        data = await service.list(filters, actor)
+        data = await service.list(list_filters, actor)
         return _to_paginated_org_type(data)

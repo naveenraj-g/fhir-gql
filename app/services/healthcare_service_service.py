@@ -2,19 +2,25 @@
 Business logic service for the HealthcareService resource.
 
 HealthcareServiceService sits between the router/resolvers and
-HealthcareServiceClient. It owns:
-  - `provided_by` (-> Organization, scalar), `location[]` (-> Location,
-    list), and `coverage_area[]` (-> Location, list) validation on create —
-    each must reference an existing resource in the caller's own tenant,
-    via the shared app.services.tenant_scope.validate_reference helper
-    (also used by OrganizationsService and LocationService). None of these
-    are patchable — HealthcareServicePatchSchema only exposes scalar/photo
-    fields, matching Organization's create-only reference shape, not
-    Location's patchable one — so no re-validation is needed on update().
-  - Empty-patch rejection (422 if the caller sends an empty PATCH body).
-  - Tenant-ownership enforcement on by-id operations: get_by_id/update/delete
-    fetch the resource first and 404 if its org_id doesn't match the
-    caller's, via the shared check_tenant_ownership helper.
+HealthcareServiceClient. It is a thin pass-through — same shape as
+OrganizationsService/LocationService — because fhir-server now owns every
+rule that used to live here:
+  - `provided_by` (-> Organization), `location[]` (-> Location), and
+    `coverage_area[]` (-> Location) existence/tenant-match validation
+    (previously done client-side against OrganizationClient/LocationClient)
+    are gone. fhir-server's own repository-level validation is authoritative
+    — see app/repository/healthcare_service/full.py on fhir-server, which
+    raises a 404 on a missing/cross-tenant reference — pre-checking here
+    only risked disagreeing with the server. This validation now applies on
+    both create AND update, since fhir-server's HealthcareServicePatchSchema
+    exposes `provided_by`/`location`/`coverage_area` too (unlike this
+    gateway's pre-rollout assumption that only scalar/photo fields were
+    patchable).
+  - The old "fetch unauthenticated, check_tenant_ownership client-side, then
+    refetch" dance on get_by_id/update/delete is gone too — fhir-server's
+    `get_healthcare_service_scoped()` already 404s a cross-org access
+    server-side once the caller's JWT is forwarded (see
+    HealthcareServiceClient), so each of those is now a single client call.
 
 The service does NOT inject created_by/updated_by — FhirClient does that
 automatically from actor.sub on every POST and PATCH.
@@ -24,14 +30,11 @@ from fastapi import HTTPException, status
 
 from app.auth.models import AuthUser
 from app.fhir_client.healthcare_service import HealthcareServiceClient
-from app.fhir_client.location import LocationClient
-from app.fhir_client.organization import OrganizationClient
 from app.schemas.healthcare_service.input import (
     HealthcareServiceCreateSchema,
     HealthcareServicePatchSchema,
     ListHealthcareServicesSchema,
 )
-from app.services.tenant_scope import check_tenant_ownership, validate_reference
 
 
 class HealthcareServiceService:
@@ -42,23 +45,13 @@ class HealthcareServiceService:
     via Factory provider, so it holds no shared state between requests.
     """
 
-    def __init__(
-        self,
-        client: HealthcareServiceClient,
-        organization_client: OrganizationClient,
-        location_client: LocationClient,
-    ) -> None:
+    def __init__(self, client: HealthcareServiceClient) -> None:
         """
         Args:
-            client:              The HealthcareServiceClient injected by the DI container.
-            organization_client: OrganizationClient, injected purely to validate
-                                  `provided_by` references — see class docstring.
-            location_client:     LocationClient, injected purely to validate
-                                  `location[]`/`coverage_area[]` references.
+            client: The HealthcareServiceClient injected by the DI container.
+                    Provides fhir-server access for all HealthcareService operations.
         """
         self._client = client
-        self._org_client = organization_client
-        self._location_client = location_client
 
     async def create(
         self,
@@ -67,48 +60,21 @@ class HealthcareServiceService:
         accept: str | None = None,
     ) -> dict:
         """
-        Create a new HealthcareService resource, validating `provided_by`,
-        `location[]`, and `coverage_area[]` references when provided.
+        Create a new HealthcareService resource on the fhir-server.
+
+        fhir-server validates `provided_by`/`location`/`coverage_area`
+        (existence, tenant match) server-side and returns 404/422 — this
+        method does not re-implement any of that.
 
         Args:
-            dto:    Validated creation payload from the request body.
-            actor:  Authenticated user performing the creation.
+            dto:    Validated create input from the resolver/router.
+            actor:  Authenticated caller — used by FhirClient for created_by
+                    and forwarded as the Authorization header.
             accept: Content-type preference forwarded to the fhir-server.
 
         Returns:
             The newly created HealthcareService resource dict (plain JSON or FHIR R4).
-
-        Raises:
-            HTTPException(422): If any reference is malformed.
-            HTTPException(404): If any reference points at a non-existent or cross-tenant resource.
         """
-        if dto.provided_by is not None:
-            await validate_reference(
-                dto.provided_by,
-                resource_type="Organization",
-                get_by_id=self._org_client.get_by_id,
-                actor=actor,
-                field_name="provided_by",
-            )
-        if dto.location is not None:
-            for entry in dto.location:
-                await validate_reference(
-                    entry.reference,
-                    resource_type="Location",
-                    get_by_id=self._location_client.get_by_id,
-                    actor=actor,
-                    field_name="location",
-                )
-        if dto.coverage_area is not None:
-            for entry in dto.coverage_area:
-                await validate_reference(
-                    entry.reference,
-                    resource_type="Location",
-                    get_by_id=self._location_client.get_by_id,
-                    actor=actor,
-                    field_name="coverage_area",
-                )
-
         payload = dto.model_dump(exclude_none=True, mode="json")
         return await self._client.create(payload, actor, accept=accept)
 
@@ -116,18 +82,21 @@ class HealthcareServiceService:
         self, service_id: int, actor: AuthUser, accept: str | None = None
     ) -> dict:
         """
-        Fetch a single HealthcareService by its numeric ID, scoped to the caller's org.
+        Fetch a single HealthcareService by its integer ID.
 
-        Raises:
-            HTTPException(404): If not found, or found but owned by a different org.
+        fhir-server scopes this to the caller's own org via the verified JWT
+        (get_healthcare_service_scoped()) and 404s a cross-org access itself
+        — no client-side ownership check needed here.
+
+        Args:
+            service_id: The integer primary key of the HealthcareService.
+            actor:      Authenticated caller — forwarded as the Authorization header.
+            accept:     Content-type preference forwarded to the fhir-server.
+
+        Returns:
+            The HealthcareService resource dict in the requested format.
         """
-        internal = await self._client.get_by_id(service_id)
-        check_tenant_ownership(
-            internal, actor, not_found_detail="HealthcareService not found."
-        )
-        if accept is None:
-            return internal
-        return await self._client.get_by_id(service_id, accept=accept)
+        return await self._client.get_by_id(service_id, actor, accept=accept)
 
     async def list(
         self,
@@ -136,16 +105,44 @@ class HealthcareServiceService:
         accept: str | None = None,
     ) -> dict:
         """
-        Return a paginated, optionally filtered list of HealthcareService resources.
+        Return a paginated, filtered list of HealthcareService resources.
 
-        No ownership check here — matches OrganizationsService.list()/LocationService.list().
+        org_id is never forwarded as a filter — fhir-server always scopes
+        HealthcareService reads to the caller's own org via the verified JWT.
+
+        Args:
+            filters: Validated query parameters from the resolver/router.
+            actor:   Authenticated caller — forwarded as the Authorization header.
+            accept:  Content-type preference — FHIR R4 wraps results in a Bundle.
+
+        Returns:
+            Paginated plain JSON dict or FHIR Bundle depending on `accept`.
         """
         return await self._client.list(
+            actor,
             accept=accept,
             name=filters.name,
             active=filters.active,
+            identifier=filters.identifier,
+            specialty=filters.specialty,
+            characteristic=filters.characteristic,
+            program=filters.program,
+            location=filters.location,
+            endpoint=filters.endpoint,
+            sort=filters.sort,
+            total_mode=filters.total_mode,
             limit=filters.limit,
             offset=filters.offset,
+            # Query-string names below diverge from the Python field names
+            # they come from (fhir-server's router aliases them, e.g.
+            # `service-category` for category) — passed as a merged dict
+            # since they aren't valid Python keyword-argument names on their own.
+            **{
+                "service-category": filters.category,
+                "service-type": filters.service_type,
+                "organization": filters.provided_by,
+                "coverage-area": filters.coverage_area,
+            },
         )
 
     async def update(
@@ -156,20 +153,25 @@ class HealthcareServiceService:
         accept: str | None = None,
     ) -> dict:
         """
-        Partially update a HealthcareService resource, scoped to the caller's org.
+        Partially update a HealthcareService resource.
 
-        No reference re-validation needed — HealthcareServicePatchSchema
-        doesn't expose provided_by/location/coverage_area at all.
+        fhir-server scopes this to the caller's own org (404 on mismatch)
+        and validates `provided_by`/`location`/`coverage_area` (existence,
+        tenant match) server-side.
+
+        Args:
+            service_id: The integer primary key of the HealthcareService to update.
+            dto:        Validated partial payload; all fields Optional.
+            actor:      Authenticated user — used by FhirClient for updated_by
+                        and forwarded as the Authorization header.
+            accept:     Content-type preference forwarded to the fhir-server.
+
+        Returns:
+            The updated HealthcareService resource dict in the requested format.
 
         Raises:
-            HTTPException(404): If not found, or found but owned by a different org.
             HTTPException(422): If the request body contained no updateable fields.
         """
-        internal = await self._client.get_by_id(service_id)
-        check_tenant_ownership(
-            internal, actor, not_found_detail="HealthcareService not found."
-        )
-
         payload = dto.model_dump(exclude_none=True, mode="json")
         if not payload:
             raise HTTPException(
@@ -180,13 +182,13 @@ class HealthcareServiceService:
 
     async def delete(self, service_id: int, actor: AuthUser) -> None:
         """
-        Delete a HealthcareService resource, scoped to the caller's org.
+        Delete a HealthcareService resource.
 
-        Raises:
-            HTTPException(404): If not found, or found but owned by a different org.
+        fhir-server scopes this to the caller's own org (404 on mismatch)
+        server-side — no client-side ownership check needed here.
+
+        Args:
+            service_id: The integer primary key of the HealthcareService to delete.
+            actor:      Authenticated user — forwarded as the Authorization header.
         """
-        internal = await self._client.get_by_id(service_id)
-        check_tenant_ownership(
-            internal, actor, not_found_detail="HealthcareService not found."
-        )
-        await self._client.delete(service_id)
+        await self._client.delete(service_id, actor)

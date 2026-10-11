@@ -1,9 +1,11 @@
+from typing import Annotated
+
 import strawberry
 
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
 from app.gql.location.types.input import LocationCreateInput, LocationPatchInput
-from app.gql.location.types.types import LocationType
+from app.gql.location.types.response import LocationType
 from app.gql.permissions import require_gql_permission
 from app.schemas.location.response import LocationResponse
 
@@ -19,18 +21,28 @@ class LocationMutation:
 
     @strawberry.mutation(
         description=(
-            "Create a new Location. `userId` and `orgId` are required for tenant scoping. If "
-            "`managingOrganization` is provided, it must reference an existing organization in "
-            "the caller's own tenant. If `partOf` is provided, it must reference an existing "
-            "Location in the caller's own tenant. `createdBy` is stamped automatically from the "
-            "caller's JWT. Requires the `location:create` permission."
+            "Create a new Location and any combination of its sub-resources "
+            "(identifier, type, alias, telecom, hoursOfOperation, endpoint) atomically in "
+            "one request. If `managingOrganization` is provided, fhir-server validates it "
+            "exists and belongs to the caller's own tenant — a GraphQL error with "
+            "`extensions.code == 404` otherwise. If `partOf` is provided, fhir-server "
+            "validates it exists and belongs to the caller's own tenant. `createdBy` is "
+            "stamped automatically from the caller's JWT. Requires the `location:create` "
+            "permission."
         )
     )
     @translate_errors
     async def create_location(
-        self, info: strawberry.types.Info, input: LocationCreateInput
+        self,
+        info: strawberry.types.Info,
+        input: Annotated[
+            LocationCreateInput,
+            strawberry.argument(
+                description="The Location (and any sub-resources) to create."
+            ),
+        ],
     ) -> LocationType:
-        """Create a new Location — mirrors POST /locations/, including managingOrganization/partOf validation in LocationService."""
+        """Create a new Location — mirrors POST /locations/."""
         actor = require_gql_permission(info, "location", "create")
         service = get_container(info).location.location_service()
         dto = input.to_pydantic()
@@ -39,18 +51,30 @@ class LocationMutation:
 
     @strawberry.mutation(
         description=(
-            "Partially update a Location's scalar fields. Array sub-resources are not "
-            "patchable here (delete and re-create). `partOf` (re-parenting) and "
-            "`managingOrganization` ARE patchable and are re-validated for existence/tenant "
-            "match; `partOf` changes are additionally checked to avoid a circular hierarchy "
-            "(`extensions.code == 409`). Scoped to the caller's organization — raises "
-            "`extensions.code == 404` if the Location belongs to a different org. `updatedBy` is "
-            "stamped automatically from the caller's JWT. Requires the `location:update` permission."
+            "Partially update a Location. Only supplied fields are written; every "
+            "supplied sub-resource list (identifier, type, alias, telecom, "
+            "hoursOfOperation, endpoint — even `[]`) replaces the corresponding rows "
+            "wholesale. `partOf` and `managingOrganization` may be set to null to clear "
+            "the reference, and re-parenting via `partOf` is re-validated server-side to "
+            "avoid a circular hierarchy (`extensions.code == 409`). Scoped to the "
+            "caller's organization — raises a 404 GraphQL error if the Location belongs "
+            "to a different org. `updatedBy` is stamped automatically from the caller's "
+            "JWT. Requires the `location:update` permission."
         )
     )
     @translate_errors
     async def update_location(
-        self, info: strawberry.types.Info, location_id: int, input: LocationPatchInput
+        self,
+        info: strawberry.types.Info,
+        location_id: Annotated[
+            int, strawberry.argument(description="Public location identifier.")
+        ],
+        input: Annotated[
+            LocationPatchInput,
+            strawberry.argument(
+                description="Fields to update — only these are written."
+            ),
+        ],
     ) -> LocationType:
         """Partially update a Location — mirrors PATCH /locations/{id}."""
         actor = require_gql_permission(info, "location", "update")
@@ -61,15 +85,19 @@ class LocationMutation:
 
     @strawberry.mutation(
         description=(
-            "Permanently delete a Location and all its associated child records. Scoped to the "
-            "caller's organization — raises `extensions.code == 404` if the Location belongs to "
-            "a different org. Irreversible. Requires the `location:delete` permission. Returns "
-            "true on success."
+            "Permanently delete a Location and all its associated child records. "
+            "Scoped to the caller's organization — raises a 404 GraphQL error if the "
+            "Location belongs to a different org. Irreversible. Requires the "
+            "`location:delete` permission. Returns true on success."
         )
     )
     @translate_errors
     async def delete_location(
-        self, info: strawberry.types.Info, location_id: int
+        self,
+        info: strawberry.types.Info,
+        location_id: Annotated[
+            int, strawberry.argument(description="Public location identifier.")
+        ],
     ) -> bool:
         """Delete a Location and its child records — mirrors DELETE /locations/{id}. Returns true on success."""
         actor = require_gql_permission(info, "location", "delete")

@@ -3,6 +3,7 @@ from app.schemas.location.enums import LocationMode, LocationStatus
 from app.schemas.location.fhir_schemas import FhirBundleResponse, FhirLocationResponse
 from app.schemas.location.input import (
     ListLocationsSchema,
+    LocationAliasInput,
     LocationCreateSchema,
     LocationEndpointInput,
     LocationHoursOfOperationInput,
@@ -12,6 +13,7 @@ from app.schemas.location.input import (
     LocationTypeInput,
 )
 from app.schemas.location.response import (
+    LocationAliasResponse,
     LocationEndpointResponse,
     LocationHoursOfOperationResponse,
     LocationIdentifierResponse,
@@ -33,6 +35,7 @@ __all__ = [
     # Input — sub-resources
     "LocationIdentifierInput",
     "LocationTypeInput",
+    "LocationAliasInput",
     "LocationTelecomInput",
     "LocationHoursOfOperationInput",
     "LocationEndpointInput",
@@ -42,6 +45,7 @@ __all__ = [
     # Response — sub-resources
     "LocationIdentifierResponse",
     "LocationTypeResponse",
+    "LocationAliasResponse",
     "LocationTelecomResponse",
     "LocationHoursOfOperationResponse",
     "LocationEndpointResponse",
