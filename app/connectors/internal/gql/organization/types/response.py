@@ -22,7 +22,7 @@ first, the top-level `OrganizationType` / `PaginatedOrganizationType` last.
 import strawberry
 from strawberry.scalars import JSON
 
-from app.schemas.organization.response import (
+from app.connectors.internal.schemas.organization.response import (
     OrganizationAddressResponse,
     OrganizationAliasResponse,
     OrganizationCodingResponse,

@@ -1,0 +1,20 @@
+# Connector settings for Medplum — a genuinely FHIR-R4-compliant external
+# backend. See app/connectors/medplum/client.py and
+# dev-docs/17-static-architecture-and-generic-fhir-payloads.md.
+#
+# client_id/client_secret are deliberately NOT here — they're real secrets
+# (this gateway's own Medplum ClientApplication credentials, from Project
+# Admin -> Clients in the Medplum app), never committed YAML. Set them via
+# the real env vars CONNECTORS__MEDPLUM__CLIENT_ID and
+# CONNECTORS__MEDPLUM__CLIENT_SECRET instead (e.g. in .env, which is
+# gitignored) — see app/core/config.py's MedplumConnectorConfig.
+#
+# base_url/token_url below are committed defaults for the usual local
+# Medplum dev instance — override per-environment with
+# CONNECTORS__MEDPLUM__BASE_URL / CONNECTORS__MEDPLUM__TOKEN_URL, same as
+# every other nested Settings field.
+connectors:
+  medplum:
+    base_url: http://localhost:8103/fhir/R4
+    token_url: http://localhost:8103/oauth2/token
+    auth_mode: oauth_client_credentials

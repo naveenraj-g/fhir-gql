@@ -1,4 +1,4 @@
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     ListOrganizationsSchema,
     OrganizationAddressInput,
     OrganizationAliasInput,
@@ -12,7 +12,7 @@ from app.schemas.organization.input import (
     OrganizationTelecomInput,
     OrganizationTypeInput,
 )
-from app.schemas.organization.response import (
+from app.connectors.internal.schemas.organization.response import (
     OrganizationAddressResponse,
     OrganizationAliasResponse,
     OrganizationCodingResponse,

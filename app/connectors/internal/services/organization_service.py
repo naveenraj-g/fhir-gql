@@ -30,8 +30,8 @@ already-org-scoped list().
 from fastapi import HTTPException, status
 
 from app.auth.models import AuthUser
-from app.fhir_client.organization import OrganizationClient
-from app.schemas.organization.input import (
+from app.connectors.internal.clients.organization import OrganizationClient
+from app.connectors.internal.schemas.organization.input import (
     ListOrganizationsSchema,
     OrganizationCreateSchema,
     OrganizationPatchSchema,

@@ -25,35 +25,35 @@ from strawberry.scalars import JSON
 # Registers AddressUse/ContactPointSystem/etc. as GraphQL enums (side-effect
 # import) — required before wrapping any input schema whose fields use them.
 import app.gql.enums  # noqa: F401
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationAddressInput as OrganizationAddressInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationAliasInput as OrganizationAliasInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationCodingInput as OrganizationCodingInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationContactInput as OrganizationContactInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationContactTelecomInput as OrganizationContactTelecomInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationCreateSchema,
     OrganizationPatchSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationEndpointInput as OrganizationEndpointInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationIdentifierInput as OrganizationIdentifierInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationTelecomInput as OrganizationTelecomInputSchema,
 )
-from app.schemas.organization.input import (
+from app.connectors.internal.schemas.organization.input import (
     OrganizationTypeInput as OrganizationTypeInputSchema,
 )
 
@@ -181,7 +181,7 @@ class OrganizationPatchInput:
 # payload — GraphQL convention is to expose filters as plain field arguments
 # rather than a wrapped input type, so it's intentionally NOT wrapped here.
 # See app/gql/organization/queries.py, which imports it directly from
-# app.schemas.organization.input.
+# app.connectors.internal.schemas.organization.input.
 __all__ = [
     "OrganizationAddressInput",
     "OrganizationAliasInput",

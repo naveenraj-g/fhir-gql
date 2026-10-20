@@ -11,7 +11,14 @@ mirrors fhir-server's own app/core/config.py precedence and split:
      logging, and FastAPI app metadata. Same spirit as fhir-server's
      configs/config.yaml — not a secret, safe to commit, and the thing an
      operator actually hand-edits to change how the app behaves without
-     touching code.
+     touching code. `configs/connectors/<name>.yaml` sits alongside it at
+     the same precedence tier — one file per entry in
+     app.connectors.registry.CONNECTORS, holding that connector's own
+     settings (base_url, auth_mode, ...) instead of crowding every
+     connector's settings into one flat file. Secrets a connector needs
+     (client_id/secret, token_url, ...) are never committed YAML — they're
+     real env vars using the `__` nesting delimiter below, same as
+     IAM_JWKS_URL already is.
   4. Field defaults (lowest precedence) — defined on the models below.
 
 Deliberately NOT brought over from fhir-server: a `routes:`-style config for
@@ -46,6 +53,47 @@ class AppConfig(BaseModel):
     docs_enabled: bool = True
 
 
+class InternalConnectorConfig(BaseModel):
+    """Checked-in behavior for the internal connector (our own fhir-server —
+    see app.connectors.internal for why it's named "internal", not
+    "fhir_server") — see configs/connectors/internal.yaml (loaded alongside
+    configs/config.yaml, see settings_customise_sources() below) for the
+    full field-by-field rationale. base_url lives here rather than as a flat
+    Settings field, so everything about this one connector — including
+    which deployment it points at — stays in its own file; override it
+    per-environment with the real env var CONNECTORS__INTERNAL__BASE_URL
+    rather than editing the committed default."""
+
+    base_url: str = "http://localhost:8001/api/fhir/v1"
+    auth_mode: Literal["token_passthrough", "oauth_client_credentials"] = (
+        "token_passthrough"
+    )
+
+
+class MedplumConnectorConfig(BaseModel):
+    """Checked-in behavior for the medplum connector — a genuinely
+    FHIR-R4-compliant external backend, registered but not active by
+    default. See configs/connectors/medplum.yaml for the full
+    field-by-field rationale.
+
+    client_id/client_secret default to "" deliberately — never give them a
+    real committed default. app.connectors.medplum.token_manager.
+    MedplumTokenManager raises at construction time if either is empty, so
+    a deployment that sets connectors.active: medplum without also setting
+    CONNECTORS__MEDPLUM__CLIENT_ID/_SECRET fails loudly at startup instead
+    of silently 401ing on first use."""
+
+    base_url: str = "http://localhost:8103/fhir/R4"
+    token_url: str = "http://localhost:8103/oauth2/token"
+    auth_mode: Literal["token_passthrough", "oauth_client_credentials"] = (
+        "oauth_client_credentials"
+    )
+    # Real secrets — always env vars (CONNECTORS__MEDPLUM__CLIENT_ID /
+    # CONNECTORS__MEDPLUM__CLIENT_SECRET), never configs/connectors/medplum.yaml.
+    client_id: str = ""
+    client_secret: str = ""
+
+
 class ConnectorsConfig(BaseModel):
     """Selects which backend system this gateway's resource clients and
     services talk to — see app.connectors.base.Connector (the interface)
@@ -55,13 +103,30 @@ class ConnectorsConfig(BaseModel):
     Every resource client (app/fhir_client/*.py) and service is written
     against the Connector Protocol, never against a specific backend —
     `active` is the only thing that decides which concrete system is live.
-    "fhir_server" (this application, see app.connectors.fhir_server) is
-    the only connector today; adding another (e.g. Medplum, or any other
-    FHIR-R4-shaped EMR/EHR) means writing a class satisfying the Protocol,
-    registering it in app.connectors.registry.CONNECTORS, and extending
-    the Literal below to match — then `active` can be flipped to it."""
+    "internal" (this application, see app.connectors.internal — named for
+    being our own first-party backend, not "fhir_server", since every
+    external connector is also a FHIR server in the generic sense) is the
+    default. "medplum" (see app.connectors.medplum) is registered as a
+    second option — a genuinely FHIR-R4-compliant backend, authenticating
+    via oauth_client_credentials rather than internal's token_passthrough.
+    Adding a further connector (e.g. Epic) means writing a package
+    satisfying the Protocol (app/connectors/<name>/, not a single file —
+    see app.connectors.internal's module docstring), registering it in
+    app.connectors.registry.CONNECTORS, adding its own
+    configs/connectors/<name>.yaml for checked-in behavior (auth_mode,
+    etc. — secrets like client_id/secret are real env vars instead, e.g.
+    CONNECTORS__EPIC__CLIENT_ID, never committed YAML), and extending the
+    Literal below to match — then `active` can be flipped to it."""
 
-    active: Literal["fhir_server"] = "fhir_server"
+    active: Literal["internal", "medplum"] = "internal"
+
+    # Per-connector behavior sub-config — one field per entry in
+    # app.connectors.registry.CONNECTORS, each populated from its own
+    # configs/connectors/<name>.yaml.
+    internal: InternalConnectorConfig = Field(
+        default_factory=InternalConnectorConfig
+    )
+    medplum: MedplumConnectorConfig = Field(default_factory=MedplumConnectorConfig)
 
 
 class CorsConfig(BaseModel):
@@ -151,8 +216,9 @@ class Settings(BaseSettings):
     settings_customise_sources() below for the exact order.
     """
 
-    # Base URL of the downstream FHIR Server that owns persistence.
-    FHIR_SERVER_URL: str = "http://localhost:8001/api/fhir/v1"
+    # Base URL of the downstream FHIR Server that owns persistence lives in
+    # connectors.internal.base_url (InternalConnectorConfig) instead of
+    # here — see configs/connectors/internal.yaml.
 
     # Terminology is mounted outside the FHIR namespace on the FHIR Server
     # (/api/v1/terminology, not /api/fhir/v1/...), so it needs its own base URL.
@@ -209,11 +275,28 @@ class Settings(BaseSettings):
             yaml_file="configs/config.yaml",
             yaml_file_encoding="utf-8",
         )
+        # One file per connector (configs/connectors/<name>.yaml), same
+        # precedence tier as configs/config.yaml — see module docstring and
+        # ConnectorsConfig. pydantic-settings deep-merges nested dict keys
+        # across sources, so this and yaml_settings both contributing to
+        # the shared `connectors.*` key combine rather than clobber.
+        connector_yaml_settings = YamlConfigSettingsSource(
+            settings_cls,
+            yaml_file="configs/connectors/internal.yaml",
+            yaml_file_encoding="utf-8",
+        )
+        medplum_yaml_settings = YamlConfigSettingsSource(
+            settings_cls,
+            yaml_file="configs/connectors/medplum.yaml",
+            yaml_file_encoding="utf-8",
+        )
         return (
             init_settings,
             env_settings,
             dotenv_settings,
             yaml_settings,
+            connector_yaml_settings,
+            medplum_yaml_settings,
             file_secret_settings,
         )
 

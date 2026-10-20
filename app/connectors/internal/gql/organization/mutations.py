@@ -2,15 +2,15 @@ from typing import Annotated
 
 import strawberry
 
-from app.gql.context import get_container
-from app.gql.errors import translate_errors
-from app.gql.organization.types.input import (
+from app.connectors.internal.gql.organization.types.input import (
     OrganizationCreateInput,
     OrganizationPatchInput,
 )
-from app.gql.organization.types.response import OrganizationType
+from app.connectors.internal.gql.organization.types.response import OrganizationType
+from app.connectors.internal.schemas.organization.response import OrganizationResponse
+from app.gql.context import get_container
+from app.gql.errors import translate_errors
 from app.gql.permissions import require_gql_permission
-from app.schemas.organization.response import OrganizationResponse
 
 
 def _to_org_type(data: dict) -> OrganizationType:

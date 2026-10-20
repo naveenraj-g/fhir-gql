@@ -8,12 +8,23 @@ per injection avoids any cross-request state leakage. The shared FhirClient
 singleton is passed in from the CoreContainer via the `core`
 DependenciesContainer placeholder. Identical shape to
 app/di/modules/patient.py's PatientContainer.
+
+Which concrete OrganizationClient/OrganizationsService classes get wired in
+is resolved from app.connectors.resource_registry.CONNECTOR_RESOURCES, keyed
+off `settings.connectors.active` — the same "look it up by connector,
+never hardcode one" pattern as app.connectors.gql_registry.CONNECTOR_GQL.
+Swapping connectors.active swaps the implementation backing this container
+without touching this file.
 """
 
 from dependency_injector import containers, providers
 
-from app.fhir_client.organization import OrganizationClient
-from app.services.organization_service import OrganizationsService
+from app.connectors.resource_registry import CONNECTOR_RESOURCES
+from app.core.config import settings
+
+_organization_impl = CONNECTOR_RESOURCES[settings.connectors.active]["organization"]
+OrganizationClient = _organization_impl["client"]
+OrganizationsService = _organization_impl["service"]
 
 
 class OrganizationContainer(containers.DeclarativeContainer):

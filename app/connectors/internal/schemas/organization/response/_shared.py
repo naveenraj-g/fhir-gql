@@ -19,7 +19,7 @@ class _AuditFields(BaseModel):
 
 class OrganizationCodingResponse(_AuditFields):
     """One entry of a CodeableConcept's `coding[]` — mirrors fhir-server's
-    app.schemas.organization.response._shared.PlainOrganizationCoding (dropping
+    app.connectors.internal.schemas.organization.response._shared.PlainOrganizationCoding (dropping
     the `Plain` prefix, same convention as every other response model here)."""
 
     id: int = Field(..., description="Internal row ID.")

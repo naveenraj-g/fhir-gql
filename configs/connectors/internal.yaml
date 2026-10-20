@@ -1,0 +1,40 @@
+# Connector settings for "this application" — our own fhir-server. Named
+# "internal" rather than "fhir_server" because every other connector is
+# also a FHIR server in the generic sense — see
+# app/connectors/internal/client.py and
+# dev-docs/17-static-architecture-and-generic-fhir-payloads.md.
+#
+# base_url below is a committed default (points at the usual local dev
+# fhir-server) — override it per-environment with the real env var
+# CONNECTORS__INTERNAL__BASE_URL instead of editing this file, the same
+# way any other nested Settings field here can be overridden (see
+# app/core/config.py's settings_customise_sources()). It isn't a secret —
+# it's this gateway's one, fixed downstream fhir-server address — so unlike
+# an external EMR connector's client_id/secret, committing a dev default
+# here is fine.
+
+# How this connector authenticates to its backend:
+#   token_passthrough        — forward the inbound caller's own bearer JWT
+#                               as-is (app.auth.models.AuthUser.token). Legal
+#                               here because fhir-server validates JWTs
+#                               against the SAME IAM this gateway does (see
+#                               fhir-server's CLAUDE.md "Auth rollout
+#                               status") — there is no separate
+#                               token-acquisition step, and no client_id/
+#                               secret of this connector's own.
+#   oauth_client_credentials  — this gateway authenticates as itself, using
+#                               its own client_id/secret (or per-provider
+#                               equivalent — e.g. Epic's JWT-bearer SMART
+#                               backend-services flow), independent of which
+#                               end-user is calling. Every external EMR/EHR
+#                               connector (Epic, Cerner, ...) needs this
+#                               instead of token_passthrough.
+#
+# Nested under connectors.internal because YamlConfigSettingsSource maps
+# this file's structure directly onto Settings' own nested fields (it does
+# not merge into an arbitrary key) — see app/core/config.py's
+# settings_customise_sources().
+connectors:
+  internal:
+    base_url: http://localhost:8001/api/fhir/v1
+    auth_mode: token_passthrough

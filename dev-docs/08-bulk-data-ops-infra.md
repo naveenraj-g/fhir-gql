@@ -891,7 +891,8 @@ per line, with a `get_logger(__name__)` helper).
   not caught by standard "unicast" classification) and IPv6-bracket stripping for hostname comparison.
 - **Belongs in:** `fhir-gql (middleware)` — directly relevant the moment `fhir-gql` makes *any* outbound
   call driven by user/tenant-controlled input (webhook URLs, external auth issuer URLs, etc.); today
-  `fhir-gql`'s only outbound call is to the fixed, operator-configured `FHIR_SERVER_URL` and
+  `fhir-gql`'s only outbound call is to the fixed, operator-configured internal
+  connector `base_url` (`configs/connectors/internal.yaml`) and
   `IAM_JWKS_URL`, which aren't attacker-controlled, so there's no active SSRF surface yet — but this
   becomes essential the moment any user-supplied URL is fetched server-side.
 - **Port notes for fhir-gql (FastAPI/Python):** Use the stdlib `ipaddress` module

@@ -2,21 +2,23 @@ from typing import Annotated
 
 import strawberry
 
+from app.connectors.internal.gql.organization.types.filter import (
+    OrganizationFilterInput,
+)
+from app.connectors.internal.gql.organization.types.response import (
+    OrganizationType,
+    PaginatedOrganizationType,
+)
+from app.connectors.internal.schemas.organization.input import ListOrganizationsSchema
+from app.connectors.internal.schemas.organization.response import (
+    OrganizationResponse,
+    PaginatedOrganizationResponse,
+)
 from app.gql.common.pagination import LimitArg, OffsetArg, SortArg, TotalModeArg
 from app.gql.context import get_container
 from app.gql.enums import TotalModeEnum
 from app.gql.errors import translate_errors
-from app.gql.organization.types.filter import OrganizationFilterInput
-from app.gql.organization.types.response import (
-    OrganizationType,
-    PaginatedOrganizationType,
-)
 from app.gql.permissions import require_gql_permission
-from app.schemas.organization.input import ListOrganizationsSchema
-from app.schemas.organization.response import (
-    OrganizationResponse,
-    PaginatedOrganizationResponse,
-)
 
 
 def _to_org_type(data: dict) -> OrganizationType:

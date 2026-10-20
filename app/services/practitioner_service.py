@@ -32,7 +32,8 @@ Practitioner as-is, not revisiting Patient's tenant scoping.
 from fastapi import HTTPException, status
 
 from app.auth.models import AuthUser
-from app.fhir_client.organization import OrganizationClient
+from app.connectors.resource_registry import CONNECTOR_RESOURCES
+from app.core.config import settings
 from app.fhir_client.practitioner import PractitionerClient
 from app.schemas.practitioner.input import (
     ListPractitionersSchema,
@@ -57,6 +58,12 @@ from app.schemas.practitioner.input import (
 )
 from app.services.tenant_scope import validate_reference
 from app.core.logging import trace_methods
+
+# Resolved from the active connector's own registry entry (see
+# app.connectors.resource_registry) rather than a fixed connector-specific
+# import — only used here as a type hint; the actual instance is injected
+# by DI from app.di.modules.organization.OrganizationContainer.
+OrganizationClient = CONNECTOR_RESOURCES[settings.connectors.active]["organization"]["client"]
 
 
 @trace_methods

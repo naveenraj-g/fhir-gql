@@ -1,8 +1,9 @@
 # Application-behavior config for fhir-gql. Checked into git — not a secret.
-# True per-environment values (where the FHIR Server/terminology service/IAM
-# live, the Redis URL) still live in .env, never here. Precedence, highest
-# first: real env var > .env > this file > field defaults — see
-# app/core/config.py's Settings.settings_customise_sources().
+# True per-environment values (terminology service/IAM, the Redis URL) still
+# live in .env, never here — the downstream FHIR Server's own address lives
+# in configs/connectors/internal.yaml instead, alongside connectors.active
+# below. Precedence, highest first: real env var > .env > this file >
+# field defaults — see app/core/config.py's Settings.settings_customise_sources().
 #
 # Deliberately NOT here: a routes-style config for enabling/disabling
 # individual GraphQL queries or mutations. This gateway's schema is fixed at
@@ -20,10 +21,14 @@ connectors:
   # — see app/connectors/base.py and app/connectors/registry.py. Every
   # resource client is written against the Connector interface, never
   # against a specific backend, so this is the only thing that decides
-  # which system is live. "fhir_server" = this application (our own
-  # fhir-server). Add another connector's name here once one is
-  # registered in app/connectors/registry.py.
-  active: fhir_server
+  # which system is live. "internal" = this application (our own
+  # fhir-server) — named for being our own first-party backend, not
+  # "fhir_server", since any external EMR connector added later (Epic,
+  # Cerner, ...) is also a FHIR server in the generic sense. Add another
+  # connector's name here once one is registered in
+  # app/connectors/registry.py. Each connector's own settings (base_url,
+  # auth_mode, ...) live in configs/connectors/<name>.yaml, not here.
+  active: internal
 
 cors:
   # No CORSMiddleware is registered at all while this is false.

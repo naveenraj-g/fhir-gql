@@ -46,9 +46,16 @@ class CoreContainer(containers.DeclarativeContainer):
     # file changes.
     fhir_client = providers.Selector(
         lambda: settings.connectors.active,
-        fhir_server=providers.Singleton(
-            CONNECTORS["fhir_server"],
-            base_url=settings.FHIR_SERVER_URL,
+        internal=providers.Singleton(
+            CONNECTORS["internal"],
+            base_url=settings.connectors.internal.base_url,
+        ),
+        medplum=providers.Singleton(
+            CONNECTORS["medplum"],
+            base_url=settings.connectors.medplum.base_url,
+            token_url=settings.connectors.medplum.token_url,
+            client_id=settings.connectors.medplum.client_id,
+            client_secret=settings.connectors.medplum.client_secret,
         ),
     )
 

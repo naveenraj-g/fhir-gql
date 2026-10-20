@@ -1,6 +1,16 @@
 """
 The connector for *this application* — our own fhir-server.
 
+Named "internal" (not "fhir_server") because that's the property that
+actually distinguishes it from every other connector this gateway will
+ever have: it's our own, first-party backend, trusted on the same IAM this
+gateway itself validates against — not a third-party EMR/EHR. Every
+external connector (Epic, Cerner, Medplum, ...) is *also* a FHIR server in
+the generic sense, so naming this one "fhir_server" would've stopped being
+distinguishing the moment a second, external one existed. "internal" stays
+accurate regardless of how many external connectors get added later, and
+pairs naturally with their vendor-named registry entries (epic, cerner, ...).
+
 Low-level async HTTP client implementing app.connectors.base.Connector
 against fhir-server's own REST conventions (base path /api/fhir/v1,
 plain-JSON `created_by`/`updated_by` audit injection on write, FHIR
@@ -20,6 +30,18 @@ just today's only implementation of it. Selected via configs/config.yaml's
 Singleton by app.di.core.CoreContainer, so the underlying httpx connection
 pool is shared and reused across all requests. `aclose()` must be called
 during application shutdown to drain the pool cleanly.
+
+Auth mode — see configs/connectors/internal.yaml
+(`connectors.internal.auth_mode`): this connector always forwards the
+caller's own inbound bearer JWT as-is (`actor.token`, below) rather than
+acquiring a separate credential of its own. That's only legal because
+fhir-server validates JWTs against the SAME IAM this gateway does (see
+fhir-server's CLAUDE.md "Auth rollout status") — there is no separate
+token-acquisition step, unlike an external EMR/EHR connector (Epic,
+Cerner, ...), which authenticates as this gateway itself via its own
+client_id/secret, independent of which end-user is calling. See
+dev-docs/17-static-architecture-and-generic-fhir-payloads.md for the full
+reasoning behind that split.
 """
 
 from enum import Enum
@@ -32,7 +54,7 @@ from app.core.logging import trace_methods
 
 
 @trace_methods
-class FhirServerConnector:
+class InternalConnector:
     """
     Async HTTP wrapper around fhir-server's REST API — the connector for
     *this application*. See module docstring.

@@ -57,11 +57,17 @@ class OrganizationClient:
         self, data: dict, actor: AuthUser, accept: str | None = None
     ) -> dict:
         """POST /organizations — create a new Organization resource."""
-        return await self._fhir.post(_PATH, data, actor, accept=accept, inject_audit=False)
+        return await self._fhir.post(
+            _PATH, data, actor, accept=accept, inject_audit=False
+        )
 
-    async def get_by_id(self, organization_id: int, actor: AuthUser, accept: str | None = None) -> dict:
+    async def get_by_id(
+        self, organization_id: int, actor: AuthUser, accept: str | None = None
+    ) -> dict:
         """GET /organizations/{organization_id} — fetch a single Organization by integer ID."""
-        return await self._fhir.get(f"{_PATH}/{organization_id}", accept=accept, actor=actor)
+        return await self._fhir.get(
+            f"{_PATH}/{organization_id}", accept=accept, actor=actor
+        )
 
     async def list(self, actor: AuthUser, accept: str | None = None, **params) -> dict:
         """

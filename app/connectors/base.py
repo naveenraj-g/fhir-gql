@@ -13,8 +13,8 @@ so a resource client's constructor can ask for "a connector" rather than
 "our own fhir-server client" — any system satisfying this Protocol is a
 legal caller, not just the one concrete implementation we have today.
 
-Today there's exactly one connector: app.connectors.fhir_server.
-FhirServerConnector, representing *this* application (our own fhir-server).
+Today there's exactly one connector: app.connectors.internal.
+InternalConnector, representing *this* application (our own fhir-server).
 Which connector is active is a config choice — see app.connectors.registry
 and configs/config.yaml's `connectors.active` — not something any resource
 client or service ever needs to know about.
@@ -29,11 +29,11 @@ so the `path` a resource client passes in is only ever meaningful to
 *that* connector — nothing above this interface should assume a specific
 URL shape.
 
-A `Protocol`, not an ABC: structural typing means FhirServerConnector
+A `Protocol`, not an ABC: structural typing means InternalConnector
 doesn't need to inherit from this class at all (and doesn't) — it just
 needs to have these methods with these signatures. That keeps the concrete
 connector free to also expose extra, connector-specific methods (as
-FhirServerConnector does for its own error-detail extraction) without this
+InternalConnector does for its own error-detail extraction) without this
 interface caring.
 """
 

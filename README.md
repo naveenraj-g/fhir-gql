@@ -67,9 +67,11 @@ cp .env.example .env           # point at your fhir-server / IAM / Redis instanc
 just dev                       # uvicorn app.main:app --port 8005 --reload
 ```
 
-`.env` needs a running `fhir-server` (`FHIR_SERVER_URL`), a BetterAuth-compatible IAM
-issuer for JWT validation (`IAM_JWKS_URL` / `IAM_ISSUER`), and Redis for rate limiting
-(`REDIS_URL` — falls back to an in-process store if unreachable).
+`.env` needs a BetterAuth-compatible IAM issuer for JWT validation
+(`IAM_JWKS_URL` / `IAM_ISSUER`) and Redis for rate limiting (`REDIS_URL` —
+falls back to an in-process store if unreachable). The running `fhir-server`
+instance's address is `configs/connectors/internal.yaml`'s `base_url`
+instead (override per-environment with `CONNECTORS__INTERNAL__BASE_URL`).
 
 ## Extending with another resource
 
