@@ -2,7 +2,8 @@
 Maps `connectors.active` to that connector's own per-resource client and
 service classes — the DI counterpart of app.connectors.registry.CONNECTORS
 (the connector's base HTTP implementation) and
-app.connectors.gql_registry.CONNECTOR_GQL (its GraphQL surface).
+app.connectors.translator_registry.ORGANIZATION_TRANSLATORS (its GraphQL
+wire-translation surface).
 
 DI modules (app/di/modules/<resource>.py) and any service that needs
 another resource's client directly (e.g. PractitionerService needing

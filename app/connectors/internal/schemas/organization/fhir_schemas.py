@@ -1,12 +1,19 @@
 """
 Pydantic models representing the FHIR R4 Organization resource shape.
 
-These models exist ONLY for OpenAPI documentation purposes — they tell
+Originally written only for OpenAPI documentation purposes — telling
 Swagger UI what the response looks like when the client sends
-`Accept: application/fhir+json`. They are never used for runtime validation
-because route handlers return JSONResponse directly (bypassing
-response_model validation by design) — same convention as
-app/schemas/patient/fhir_schemas.py.
+`Accept: application/fhir+json` (route handlers return JSONResponse
+directly, bypassing response_model validation by design, same convention
+as app/schemas/patient/fhir_schemas.py) — these models are now also the
+canonical FHIR shape at the GraphQL boundary: app.gql.organization's
+types/queries/mutations import them directly rather than redefining a
+second, drifting copy of "what does a FHIR R4 Organization look like".
+
+`FhirOrganizationInput` is the write-side counterpart, used by both
+`createFhirOrganization`/`updateFhirOrganization` (see
+app.gql.organization.mutations) — see its own docstring for why one shape
+covers both create and update.
 
 FHIR R4 Organization resource spec: https://hl7.org/fhir/R4/organization.html
 """
@@ -222,3 +229,35 @@ class FhirBundleResponse(BaseModel):
     entry: list[FhirBundleEntry] | None = Field(
         default=None, description="Results — each entry wraps one Organization resource"
     )
+
+
+class FhirOrganizationInput(BaseModel):
+    """
+    The write-side counterpart to FhirOrgResponse — same genuine FHIR R4
+    Organization shape, minus `resourceType`/`id` (the id is a separate
+    `id: str` mutation argument on update; create doesn't take one at all).
+
+    Used as-is for BOTH create and update: fhir-server's own
+    OrganizationCreateSchema/OrganizationPatchSchema are themselves nearly
+    identical (Organization has no required-at-this-layer fields), so
+    there is no create-vs-patch shape difference to encode here either.
+    Any field a connector's translator can't reach on write (e.g. a
+    Reference's logical-identifier fallback — fhir-server's
+    partof_identifier_*/assigner_identifier_*/reference_identifier_*,
+    since FhirReference/FhirIdentifier.assigner don't carry one) is simply
+    left unset by that translator — see
+    app.connectors.internal.translators.organization and
+    app.connectors.medplum.translators.organization.
+    """
+
+    active: bool | None = Field(default=None)
+    name: str | None = Field(default=None)
+    identifier: list[FhirIdentifier] | None = Field(default=None)
+    type: list[FhirCodeableConcept] | None = Field(default=None)
+    alias: list[str] | None = Field(default=None)
+    telecom: list[FhirContactPoint] | None = Field(default=None)
+    address: list[FhirAddress] | None = Field(default=None)
+    partOf: FhirReference | None = Field(default=None)
+    contact: list[FhirOrgContact] | None = Field(default=None)
+    endpoint: list[FhirReference] | None = Field(default=None)
+    extension: list[dict] | None = Field(default=None)

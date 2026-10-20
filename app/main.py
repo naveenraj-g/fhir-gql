@@ -25,7 +25,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 
-from app.connectors.universal.schema import graphql_router as universal_graphql_router
 from app.core.config import settings
 from app.core.errors import (
     AppError,
@@ -165,18 +164,6 @@ if settings.cors.enabled:
 app.include_router(
     graphql_router,
     prefix="/graphql",
-)
-
-# EXPERIMENTAL — see app/connectors/universal/__init__.py's package
-# docstring and dev-docs/18-universal-fhir-graphql-experiment.md. A second,
-# independent GraphQL schema (Organization only, full CRUD) proving out
-# "one universal, FHIR R4-shaped GraphQL schema, with per-connector
-# translation" as an alternative to the main /graphql endpoint above.
-# Mounted at its own path so it can be evaluated side-by-side without
-# touching the main schema/endpoint at all.
-app.include_router(
-    universal_graphql_router,
-    prefix="/graphql-fhir",
 )
 
 

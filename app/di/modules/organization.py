@@ -12,9 +12,9 @@ app/di/modules/patient.py's PatientContainer.
 Which concrete OrganizationClient/OrganizationsService classes get wired in
 is resolved from app.connectors.resource_registry.CONNECTOR_RESOURCES, keyed
 off `settings.connectors.active` — the same "look it up by connector,
-never hardcode one" pattern as app.connectors.gql_registry.CONNECTOR_GQL.
-Swapping connectors.active swaps the implementation backing this container
-without touching this file.
+never hardcode one" pattern as app.connectors.translator_registry.
+ORGANIZATION_TRANSLATORS. Swapping connectors.active swaps the
+implementation backing this container without touching this file.
 """
 
 from dependency_injector import containers, providers

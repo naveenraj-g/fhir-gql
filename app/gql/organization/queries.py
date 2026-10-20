@@ -1,18 +1,19 @@
 """
-Query fields for the universal-FHIR-GraphQL experiment's Organization
-resource. See app.connectors.universal's package docstring for the overall
-idea.
+Query fields for the Organization resource — one canonical, genuinely
+FHIR R4-shaped Organization regardless of which connector (internal,
+medplum, ...) is actually active. See app.gql.organization's package
+docstring for the overall idea.
 """
 
 from typing import Annotated
 
 import strawberry
 
-from app.connectors.universal.gql.types import FhirOrganizationType
-from app.connectors.universal.schemas import FhirOrgResponse
-from app.connectors.universal.translators import active_organization_translator
+from app.connectors.internal.schemas.organization.fhir_schemas import FhirOrgResponse
+from app.connectors.translator_registry import active_organization_translator
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
+from app.gql.organization.types.response import FhirOrganizationType
 from app.gql.permissions import require_gql_permission
 
 
@@ -26,17 +27,9 @@ def _entries_from_bundle(bundle: dict) -> list[dict]:
     return [bundle]
 
 
-@strawberry.type(
-    description=(
-        "EXPERIMENTAL — universal FHIR Organization queries. One GraphQL "
-        "schema, genuinely FHIR R4-shaped, regardless of which connector "
-        "(connectors.active) is actually serving it. See "
-        "dev-docs/18-universal-fhir-graphql-experiment.md."
-    )
-)
+@strawberry.type(description="Query fields for the Organization resource.")
 class FhirOrganizationQuery:
-    """Root query mixin for the universal-FHIR-GraphQL experiment. Mixed
-    into the root `Query` type in app/connectors/universal/schema.py."""
+    """Query fields for the Organization resource. Mixed into the root `Query` type in app/gql/schema.py."""
 
     @strawberry.field(
         description="Fetch a single Organization by its FHIR resource id, in genuine FHIR R4 shape. Requires the `organization:read` permission."

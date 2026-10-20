@@ -2,21 +2,20 @@
 Composes the GraphQL schema from per-domain Query/Mutation resolver mixins
 and exposes it as a FastAPI-mountable router.
 
-Resources that have migrated into a connector's own package (see
-app.connectors.internal.gql — Organization today) are pulled in via
-app.connectors.gql_registry.CONNECTOR_GQL, keyed off
-`settings.connectors.active`, rather than imported directly here — that's
-what makes the active connector's GraphQL surface swap in "dynamically"
-(at startup, from config, same as app.connectors.registry.CONNECTORS
-already does for the HTTP side) rather than always being the same fixed
-set of resource modules. Resources not yet migrated into any connector
-package (Patient, Location, ...) are still mixed in directly below, the
-same as before — add a resource to CONNECTOR_GQL once it moves, and remove
-its direct mixin here.
+Every resource's Query/Mutation mixin is imported directly from its own
+`app/gql/<resource>/` package and mixed into the root Query/Mutation below.
+Organization is genuinely FHIR R4-shaped end-to-end (see
+app.gql.organization's package docstring) — its resolvers call the active
+connector directly and translate via
+app.connectors.translator_registry.active_organization_translator(), keyed
+off `settings.connectors.active`, rather than going through a per-connector
+service/client layer the way the other resources below do. That's an
+internal implementation detail of app.gql.organization; from this module's
+point of view it's mixed in exactly the same way as every other resource.
 
-Adding a new, not-yet-migrated resource to the GraphQL API means: write its
-`app/gql/types/<resource>.py` + `app/gql/resolvers/<resource>.py`, then add
-its Query/Mutation mixin below.
+Adding a new resource to the GraphQL API means: write its
+`app/gql/<resource>/types/` + `queries.py` + `mutations.py`, then add its
+Query/Mutation mixin below.
 
 GraphQL is this service's only transport — the REST routers that used to
 live in app/routers/ have been removed (app/schemas/ stays; every type
@@ -27,7 +26,6 @@ rebuilt on top of them again later if needed).
 import strawberry
 from strawberry.fastapi import GraphQLRouter
 
-from app.connectors.gql_registry import CONNECTOR_GQL
 from app.core.config import settings
 from app.gql.context import get_context
 from app.gql.healthcare_service.mutations import HealthcareServiceMutation
@@ -35,6 +33,8 @@ from app.gql.healthcare_service.queries import HealthcareServiceQuery
 from app.gql.location.mutations import LocationMutation
 from app.gql.location.queries import LocationQuery
 from app.gql.logging import GqlLoggingExtension
+from app.gql.organization.mutations import FhirOrganizationMutation
+from app.gql.organization.queries import FhirOrganizationQuery
 from app.gql.patient.mutations import PatientMutation
 from app.gql.patient.queries import PatientQuery
 from app.gql.practitioner.mutations import PractitionerMutation
@@ -47,16 +47,10 @@ from app.gql.slot.mutations import SlotMutation
 from app.gql.slot.queries import SlotQuery
 from app.gql.test_subscription import TestSubscription
 
-# The active connector's own Query/Mutation mixin (today: InternalQuery/
-# InternalMutation, covering Organization) — see module docstring.
-_active_connector_gql = CONNECTOR_GQL[settings.connectors.active]
-_ActiveConnectorQuery = _active_connector_gql["query"]
-_ActiveConnectorMutation = _active_connector_gql["mutation"]
-
 
 @strawberry.type
 class Query(
-    _ActiveConnectorQuery,
+    FhirOrganizationQuery,
     PatientQuery,
     LocationQuery,
     HealthcareServiceQuery,
@@ -67,22 +61,16 @@ class Query(
 ):
     """
     Root GraphQL query type — merges every domain's query fields via mixin
-    inheritance. Mixes in the active connector's own Query mixin (today
-    `InternalQuery`, covering Organization — see
-    app.connectors.gql_registry), plus `PatientQuery`, `LocationQuery`,
+    inheritance: `FhirOrganizationQuery`, `PatientQuery`, `LocationQuery`,
     `HealthcareServiceQuery`, `PractitionerQuery`, `PractitionerRoleQuery`,
-    `ScheduleQuery`, and `SlotQuery` (not yet migrated into a connector
-    package) and `PatientLazyQuery` (an EXAMPLE mixin demonstrating
-    lazy/parallel/dependent resolver composition — see
-    app/gql/examples/patient_lazy_resolvers.py). Add further resources'
-    Query mixins here alongside them as they are ported over, until they
-    too migrate into a connector package.
+    `ScheduleQuery`, and `SlotQuery`. Add further resources' Query mixins
+    here alongside them as they're added.
     """
 
 
 @strawberry.type
 class Mutation(
-    _ActiveConnectorMutation,
+    FhirOrganizationMutation,
     PatientMutation,
     LocationMutation,
     HealthcareServiceMutation,
@@ -91,7 +79,7 @@ class Mutation(
     ScheduleMutation,
     SlotMutation,
 ):
-    """Root GraphQL mutation type — merges every domain's mutation fields via mixin inheritance. See Query's docstring for the same connector-vs-not-yet-migrated split."""
+    """Root GraphQL mutation type — merges every domain's mutation fields via mixin inheritance."""
 
 
 @strawberry.type

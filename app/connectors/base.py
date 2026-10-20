@@ -85,3 +85,63 @@ class Connector(Protocol):
     async def aclose(self) -> None:
         """Release the connector's underlying connection pool at shutdown."""
         ...
+
+
+class OrganizationWireTranslator(Protocol):
+    """
+    One connector's read/write wire conventions for the canonical FHIR R4
+    Organization shape used by app.gql.organization (see that package's
+    __init__.py docstring).
+
+    Structural, same spirit as `Connector` above: each connector
+    (app.connectors.internal, app.connectors.medplum, ...) implements this
+    with its own class rather than inheriting from it. Which connector's
+    translator is active is resolved by
+    app.connectors.translator_registry.active_organization_translator(),
+    keyed off the same `connectors.active` config value as `Connector`
+    itself.
+
+    Both of today's connectors already return genuine FHIR R4 JSON for
+    reads — fhir-server via its own `Accept: application/fhir+json` content
+    negotiation, Medplum natively — so `from_wire()` is identity for both.
+    Writes are NOT symmetric with reads: fhir-server's POST/PATCH only ever
+    accept its own flattened plain-JSON create/patch schemas, never genuine
+    FHIR JSON (see app.connectors.internal.schemas.organization.input.core's
+    OrganizationCreateSchema/OrganizationPatchSchema), which is why there's
+    a to_wire_create/to_wire_patch pair instead of one to_wire().
+    """
+
+    #: Accept header to request FHIR R4 shape from this backend, or None if
+    #: the backend only ever speaks FHIR (nothing to negotiate).
+    accept: str | None
+
+    def item_path(self, organization_id: str) -> str:
+        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
+        ...
+
+    def list_path(self) -> str:
+        """Path for GET-collection (search) and POST-create, in this
+        backend's own convention."""
+        ...
+
+    def list_params(
+        self, name: str | None, active: bool | None, limit: int, offset: int
+    ) -> dict:
+        """Canonical filter/pagination args -> this backend's own query param names."""
+        ...
+
+    def from_wire(self, raw: dict) -> dict:
+        """This backend's raw response dict -> canonical FHIR Organization
+        (or Bundle) dict. Identity for both connectors today — see class
+        docstring."""
+        ...
+
+    def to_wire_create(self, data: dict) -> dict:
+        """Canonical FHIR Organization dict (from FhirOrganizationInput) ->
+        this backend's own POST-create body shape."""
+        ...
+
+    def to_wire_patch(self, data: dict) -> dict:
+        """Canonical FHIR Organization dict (from FhirOrganizationInput) ->
+        this backend's own PATCH-update body shape."""
+        ...

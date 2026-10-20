@@ -1,91 +1,25 @@
 """
-Per-connector translation for the universal-FHIR-GraphQL experiment's
-Organization resource (see app.connectors.universal's package docstring for
-the overall idea). One module per resource — see
-app.connectors.universal.translators's __init__.py.
+internal (fhir-server) wire translation for the canonical FHIR R4
+Organization shape used by app.gql.organization (see
+app.connectors.base.OrganizationWireTranslator for the shared contract and
+app.gql.organization's package docstring for the overall idea).
 
-Each translator bridges the one canonical FHIR R4 shape used at the GraphQL
-boundary (app.connectors.universal.schemas.organization) to whatever this
-backend actually expects on the wire: path conventions, query-param names,
-the Accept header needed to get FHIR shape out of a read, and — on write —
-the real field-level remapping a non-FHIR-native backend's create/patch
-schema requires.
-
-Both of today's connectors already return genuine FHIR R4 JSON for reads —
-fhir-server via its own `Accept: application/fhir+json` content
-negotiation, Medplum natively — so `from_wire()` is identity for both.
-
-Writes are NOT symmetric with reads, and that asymmetry is the whole reason
-this module has a `to_wire_create`/`to_wire_patch` pair instead of one
-`to_wire()`: fhir-server's POST/PATCH only ever accept its own flattened
-plain-JSON create/patch schemas, never genuine FHIR JSON, unlike its GET
-responses (see app.connectors.internal.schemas.organization.input.core's
-OrganizationCreateSchema/OrganizationPatchSchema). `InternalOrganizationTranslator`
-does the real flattening; `MedplumOrganizationTranslator` stays close to a
-pass-through since Medplum is genuinely FHIR-native already. See
-dev-docs/18-universal-fhir-graphql-experiment.md.
+Canonical shape already matches fhir-server's own
+`Accept: application/fhir+json` response exactly — what actually differs
+from genuine FHIR R4 conventions is fhir-server's own path (`/organizations`,
+not `/Organization`), its own query-param names (`limit`/`offset`, not FHIR
+search's `_count`/`_offset`), and — on write only — its own flattened
+plain-JSON create/patch body shape (see _organization_body below).
 
 A handful of fhir-server's flattened fallback fields have no canonical-FHIR
 source to translate from at all — `partof_identifier_*`, `assigner_identifier_*`,
 `reference_identifier_*` all exist to carry a Reference's *logical-identifier*
 fallback (used when there's nothing to resolve a real reference against), but
-`app.connectors.universal.schemas.organization.FhirReference`/`FhirIdentifier.assigner`
-don't model one. `InternalOrganizationTranslator` simply never populates
-those — a known, narrower gap than full fhir-server-native write support,
-not a bug.
+app.connectors.internal.schemas.organization.fhir_schemas's
+FhirReference/FhirIdentifier.assigner don't model one. This translator simply
+never populates those — a known, narrower gap than full fhir-server-native
+write support, not a bug.
 """
-
-from typing import Protocol
-
-from app.core.config import settings
-
-
-class OrganizationWireTranslator(Protocol):
-    """One connector's read/write conventions for canonical-FHIR Organization."""
-
-    #: Accept header to request FHIR R4 shape from this backend, or None if
-    #: the backend only ever speaks FHIR (nothing to negotiate).
-    accept: str | None
-
-    def item_path(self, organization_id: str) -> str:
-        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
-        ...
-
-    def list_path(self) -> str:
-        """Path for GET-collection (search) and POST-create, in this
-        backend's own convention."""
-        ...
-
-    def list_params(
-        self, name: str | None, active: bool | None, limit: int, offset: int
-    ) -> dict:
-        """Canonical filter/pagination args -> this backend's own query param names."""
-        ...
-
-    def from_wire(self, raw: dict) -> dict:
-        """This backend's raw response dict -> canonical FHIR Organization
-        (or Bundle) dict. Identity for both connectors today — see module
-        docstring."""
-        ...
-
-    def to_wire_create(self, data: dict) -> dict:
-        """Canonical FHIR Organization dict (from FhirOrganizationInput) ->
-        this backend's own POST-create body shape."""
-        ...
-
-    def to_wire_patch(self, data: dict) -> dict:
-        """Canonical FHIR Organization dict (from FhirOrganizationInput) ->
-        this backend's own PATCH-update body shape."""
-        ...
-
-
-# ── internal (fhir-server) write-side field mapping ──────────────────────────
-#
-# Every helper below takes a plain dict sliced out of a canonical-FHIR
-# Organization dict (already `model_dump(exclude_none=True)`'d from
-# FhirOrganizationInput) and returns a dict shaped like the matching
-# fhir-server Organization*Input sub-schema
-# (app.connectors.internal.schemas.organization.input).
 
 
 def _coding(c: dict) -> dict:
@@ -167,8 +101,8 @@ def _address(a: dict) -> dict:
 
 def _contact(c: dict) -> dict:
     """FhirOrgContact (purpose/name/telecom/address) -> the fully-flattened
-    OrganizationContactInput shape — the deepest translation in this module,
-    since fhir-server has no nested name/address BackboneElement here at all."""
+    OrganizationContactInput shape — the deepest translation here, since
+    fhir-server has no nested name/address BackboneElement here at all."""
     purpose = c.get("purpose") or {}
     name = c.get("name") or {}
     address = c.get("address") or {}
@@ -210,9 +144,9 @@ def _endpoint(e: dict) -> dict:
 def _organization_body(data: dict) -> dict:
     """Canonical FHIR Organization dict -> fhir-server's flattened
     OrganizationCreateSchema/OrganizationPatchSchema body. Shared by both —
-    those two schemas differ only in docstring, not in field shape (see
-    their module's docstring: Organization has no required-at-this-layer
-    fields, so create and patch bodies are shaped identically)."""
+    those two schemas differ only in docstring, not in field shape, since
+    Organization has no required-at-this-layer fields, so create and patch
+    bodies are shaped identically."""
     part_of = data.get("partOf") or {}
     body = {
         "active": data.get("active"),
@@ -232,12 +166,8 @@ def _organization_body(data: dict) -> dict:
 
 
 class InternalOrganizationTranslator:
-    """internal (fhir-server). Canonical FHIR shape already matches its
-    `Accept: application/fhir+json` response exactly — what actually differs
-    from genuine FHIR R4 conventions is fhir-server's own path (`/organizations`,
-    not `/Organization`), its own query-param names (`limit`/`offset`,
-    not FHIR search's `_count`/`_offset`), and — on write only — its own
-    flattened plain-JSON create/patch body shape (see _organization_body)."""
+    """internal (fhir-server). See module docstring for what differs from
+    genuine FHIR R4 conventions."""
 
     accept = "application/fhir+json"
 
@@ -265,49 +195,3 @@ class InternalOrganizationTranslator:
 
     def to_wire_patch(self, data: dict) -> dict:
         return _organization_body(data)
-
-
-class MedplumOrganizationTranslator:
-    """medplum. Genuinely FHIR-native, so canonical path/params/body ARE its
-    real path/params/body — this is closer to a pure pass-through than
-    `internal`'s translator is in every direction, not just reads."""
-
-    accept = None  # MedplumConnector's Content-Type is already fixed to FHIR.
-
-    def item_path(self, organization_id: str) -> str:
-        return f"/Organization/{organization_id}"
-
-    def list_path(self) -> str:
-        return "/Organization"
-
-    def list_params(
-        self, name: str | None, active: bool | None, limit: int, offset: int
-    ) -> dict:
-        params: dict = {"_count": limit, "_offset": offset}
-        if name is not None:
-            params["name"] = name
-        if active is not None:
-            params["active"] = active
-        return params
-
-    def from_wire(self, raw: dict) -> dict:
-        return raw
-
-    def to_wire_create(self, data: dict) -> dict:
-        return {"resourceType": "Organization", **data}
-
-    def to_wire_patch(self, data: dict) -> dict:
-        return {"resourceType": "Organization", **data}
-
-
-ORGANIZATION_TRANSLATORS: dict[str, OrganizationWireTranslator] = {
-    "internal": InternalOrganizationTranslator(),
-    "medplum": MedplumOrganizationTranslator(),
-}
-
-
-def active_organization_translator() -> OrganizationWireTranslator:
-    """The translator for whichever connector configs/config.yaml's
-    `connectors.active` currently selects. Shared by both
-    app.connectors.universal.gql.queries and .mutations."""
-    return ORGANIZATION_TRANSLATORS[settings.connectors.active]

@@ -1,37 +1,28 @@
 """
-Mutation fields for the universal-FHIR-GraphQL experiment's Organization
-resource. See app.connectors.universal's package docstring for the overall
-idea, and app.connectors.universal.translators's module docstring for why
-write translation is NOT a pass-through for `internal` the way reads are.
+Mutation fields for the Organization resource — same genuinely FHIR
+R4-shaped input/output regardless of which connector (internal, medplum,
+...) is actually active; each connector's translator maps this shape onto
+its own write conventions. See app.gql.organization's package docstring and
+app.connectors.base.OrganizationWireTranslator's docstring for why write
+translation is NOT a pass-through for `internal` the way reads are.
 """
 
 from typing import Annotated
 
 import strawberry
 
-from app.connectors.universal.gql.types import (
-    FhirOrganizationInput,
-    FhirOrganizationType,
-)
-from app.connectors.universal.schemas import FhirOrgResponse
-from app.connectors.universal.translators import active_organization_translator
+from app.connectors.internal.schemas.organization.fhir_schemas import FhirOrgResponse
+from app.connectors.translator_registry import active_organization_translator
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
+from app.gql.organization.types.input import FhirOrganizationInput
+from app.gql.organization.types.response import FhirOrganizationType
 from app.gql.permissions import require_gql_permission
 
 
-@strawberry.type(
-    description=(
-        "EXPERIMENTAL — universal FHIR Organization mutations. Same "
-        "genuinely FHIR R4-shaped input/output regardless of which "
-        "connector (connectors.active) actually serves it; each connector's "
-        "translator maps this shape onto its own write conventions. See "
-        "dev-docs/18-universal-fhir-graphql-experiment.md."
-    )
-)
+@strawberry.type(description="Mutation fields for the Organization resource.")
 class FhirOrganizationMutation:
-    """Root mutation mixin for the universal-FHIR-GraphQL experiment. Mixed
-    into the root `Mutation` type in app/connectors/universal/schema.py."""
+    """Mutation fields for the Organization resource. Mixed into the root `Mutation` type in app/gql/schema.py."""
 
     @strawberry.mutation(
         description=(
