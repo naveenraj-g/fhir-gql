@@ -1,33 +1,32 @@
 """
-The connector interface — the one seam between this gateway's resource
-clients/services (app/fhir_client/*.py, app/services/*.py) and whatever
-system actually stores the data.
+The connector interface — the one seam between this gateway's GraphQL
+resolvers (app.gql.organization, ...) and whatever system actually stores
+the data.
 
-Why this exists: every resource client (OrganizationClient, PatientClient,
-...) and every service is written against four HTTP-shaped verbs — but
-nothing about them actually depends on the *backend* being our own
-fhir-server. They just need something that can POST/GET/PATCH/DELETE a path
+Why this exists: a resolver is written against four HTTP-shaped verbs —
+but nothing about it actually depends on the *backend* being our own
+fhir-server. It just needs something that can POST/GET/PATCH/DELETE a path
 and hand back a dict, inject actor identity, and translate a non-2xx
 response into an HTTPException. `Connector` names that contract explicitly,
-so a resource client's constructor can ask for "a connector" rather than
-"our own fhir-server client" — any system satisfying this Protocol is a
-legal caller, not just the one concrete implementation we have today.
+so a resolver can ask for "a connector" rather than "our own fhir-server
+client" — any system satisfying this Protocol is a legal caller, not just
+the one concrete implementation we have today.
 
-Today there's exactly one connector: app.connectors.internal.
-InternalConnector, representing *this* application (our own fhir-server).
-Which connector is active is a config choice — see app.connectors.registry
-and configs/config.yaml's `connectors.active` — not something any resource
-client or service ever needs to know about.
+Today there are two connectors: app.connectors.internal.InternalConnector,
+representing *this* application (our own fhir-server), and
+app.connectors.medplum.MedplumConnector. Which connector is active is a
+config choice — see app.connectors.registry and configs/config.yaml's
+`connectors.active` — not something any resolver ever needs to know about.
 
-Adding a second connector (e.g. for Medplum, or any other FHIR-R4-shaped
-EMR/EHR) later means: write a class satisfying this Protocol, register it
-in app.connectors.registry.CONNECTORS, and set connectors.active — no
-change to any resource client, service, or schema. Each connector owns its
-own URL/path conventions internally (a real FHIR server's canonical REST
-paths look nothing like fhir-server's own `/organizations`-style routes),
-so the `path` a resource client passes in is only ever meaningful to
-*that* connector — nothing above this interface should assume a specific
-URL shape.
+Adding a second connector (e.g. for Epic, or any other FHIR-R4-shaped
+EMR/EHR) means: write a class satisfying this Protocol, register it in
+app.connectors.registry.CONNECTORS, and set connectors.active — no change
+to any resolver. Each connector owns its own URL/path conventions
+internally (a real FHIR server's canonical REST paths look nothing like
+fhir-server's own `/organizations`-style routes), so the `path` a resolver
+passes in (via its OrganizationWireTranslator, see below) is only ever
+meaningful to *that* connector — nothing above this interface should
+assume a specific URL shape.
 
 A `Protocol`, not an ABC: structural typing means InternalConnector
 doesn't need to inherit from this class at all (and doesn't) — it just
@@ -105,10 +104,10 @@ class OrganizationWireTranslator(Protocol):
     reads — fhir-server via its own `Accept: application/fhir+json` content
     negotiation, Medplum natively — so `from_wire()` is identity for both.
     Writes are NOT symmetric with reads: fhir-server's POST/PATCH only ever
-    accept its own flattened plain-JSON create/patch schemas, never genuine
-    FHIR JSON (see app.connectors.internal.schemas.organization.input.core's
-    OrganizationCreateSchema/OrganizationPatchSchema), which is why there's
-    a to_wire_create/to_wire_patch pair instead of one to_wire().
+    accept their own flattened plain-JSON shape (see
+    app.connectors.internal.translators.organization's module docstring for
+    the exact field-level mapping), never genuine FHIR JSON, which is why
+    there's a to_wire_create/to_wire_patch pair instead of one to_wire().
     """
 
     #: Accept header to request FHIR R4 shape from this backend, or None if

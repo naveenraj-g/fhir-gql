@@ -1,18 +1,17 @@
 """
-Maps REST-style exceptions raised by the service layer into GraphQL errors.
+Maps REST-style exceptions raised by the connector layer into GraphQL errors.
 
-Service methods (PatientService, OrganizationsService, ...) raise plain
-FastAPI `HTTPException`, or the app-wide `AppError` base class, exactly as
-they do when called from REST routers (see app/core/errors.py). Mutation
-resolvers also call `input.to_pydantic()`, which runs the same Pydantic
-validation (`min_length`, custom validators, ...) REST gets from the input
-schema directly, and can raise `pydantic.ValidationError`. None of these
-exception types mean anything to a GraphQL client on their own — left
-unhandled, Strawberry would report every one of them as a generic
-"unexpected error" with no status code. `translate_errors` converts them
-into `graphql.GraphQLError` carrying the original status code (in
-`extensions.code`) and message, so GraphQL clients get the same information
-REST clients get via `{"detail": ...}`.
+A connector's get/post/patch/delete (app.connectors.internal.InternalConnector,
+app.connectors.medplum.MedplumConnector) raises a plain FastAPI
+`HTTPException` on a non-2xx response from the downstream FHIR backend, or
+the app-wide `AppError` base class (see app/core/errors.py). Mutation
+resolvers also call `input.to_pydantic()`, which runs Pydantic validation
+(`min_length`, custom validators, ...) on the GraphQL input type, and can
+raise `pydantic.ValidationError`. None of these exception types mean
+anything to a GraphQL client on their own — left unhandled, Strawberry
+would report every one of them as a generic "unexpected error" with no
+status code. `translate_errors` converts them into `graphql.GraphQLError`
+carrying the original status code (in `extensions.code`) and message.
 """
 
 import functools

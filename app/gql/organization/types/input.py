@@ -20,10 +20,12 @@ from app.connectors.internal.schemas.organization.fhir_schemas import (
     FhirContactPoint,
     FhirHumanName,
     FhirIdentifier,
-    FhirOrganizationInput as FhirOrganizationInputSchema,
     FhirOrgContact,
     FhirPeriod,
     FhirReference,
+)
+from app.connectors.internal.schemas.organization.fhir_schemas import (
+    FhirOrganizationInput as FhirOrganizationInputSchema,
 )
 
 # ── Leaf sub-resources first ─────────────────────────────────────────────────

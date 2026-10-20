@@ -2,13 +2,7 @@
 Root dependency-injection container for the entire application.
 
 This module defines the top-level `Container` class using the dependency-injector
-library's declarative container pattern. It acts as the composition root — every
-service, repository, and client in the application is wired here so that:
-  - Dependencies are assembled once at startup rather than on every request.
-  - The dependency graph is explicit and testable: replacing a provider (e.g. with
-    a mock) requires changing one line here rather than hunting call sites.
-  - FastAPI route handlers receive pre-built service instances via Depends() without
-    knowing how those instances are constructed.
+library's declarative container pattern. It acts as the composition root.
 
 Wiring:
     WiringConfiguration(packages=["app"]) tells dependency-injector to scan every
@@ -18,46 +12,25 @@ Wiring:
 
 Container hierarchy:
     Container (root)
-    ├── core              →  CoreContainer          (shared infrastructure: FHIR HTTP client)
-    ├── patient           →  PatientContainer       (Patient CRUD + 9 sub-resource clients)
-    ├── organization      →  OrganizationContainer  (Organization CRUD)
-    ├── location          →  LocationContainer      (Location CRUD)
-    ├── healthcare_service →  HealthcareServiceContainer (HealthcareService CRUD)
-    ├── practitioner       →  PractitionerContainer (Practitioner CRUD + 7 sub-resource clients;
-    │                                            also depends on `organization` for
-    │                                            qualification.issuer reference validation)
-    ├── practitioner_role  →  PractitionerRoleContainer (PractitionerRole CRUD)
-    ├── schedule           →  ScheduleContainer (Schedule CRUD; depends on `practitioner`,
-    │                                            `practitioner_role`, `location`,
-    │                                            `healthcare_service`, and `patient` to validate
-    │                                            actor references and derive service_category/
-    │                                            service_type/specialty)
-    └── slot               →  SlotContainer (Slot CRUD + availability-aware bulk generation;
-                                                 depends on `schedule` and `practitioner_role`)
+    └── core  →  CoreContainer  (shared infrastructure: the active connector's
+                 FHIR HTTP client, and the Terminology HTTP client)
 
-Additional resources (encounter, ...) can be added the same way Patient,
-Organization, Location, HealthcareService, Practitioner, PractitionerRole,
-Schedule, and Slot were: a new app/di/modules/<resource>.py container,
-wired here with `core=core` (plus any sibling sub-container it needs
-directly, as Practitioner needs `organization`,
-Schedule needs `practitioner`+`practitioner_role`+`location`+`healthcare_service`+`patient`,
-and Slot needs `schedule`+`practitioner_role`), then added to
-app/gql/schema.py.
+Organization is the only FHIR resource this gateway exposes, and its
+GraphQL resolvers (app.gql.organization) don't need a domain sub-container
+of their own — they call `core.fhir_client()` directly and translate via
+app.connectors.translator_registry.active_organization_translator(), with
+no per-resource client/service layer in between. A future resource added
+the same way needs no new sub-container either, unless it has real
+orchestration logic (validation, cross-resource lookups, ...) that doesn't
+belong in a GraphQL resolver — in that case, add a
+`providers.Container(...)` the same way the old per-resource containers
+used to be wired here, with `core=core` plus any sibling sub-container it
+needs directly.
 """
 
 from dependency_injector import containers, providers
 
 from app.di.core import CoreContainer
-from app.di.modules import (
-    HealthcareServiceContainer,
-    LocationContainer,
-    OrganizationContainer,
-    PatientContainer,
-    PractitionerContainer,
-    PractitionerRoleContainer,
-    ScheduleContainer,
-    SlotContainer,
-)
 
 
 class Container(containers.DeclarativeContainer):
@@ -75,89 +48,6 @@ class Container(containers.DeclarativeContainer):
     # and automatically resolves their Provide[Container.*] dependencies at startup.
     wiring_config = containers.WiringConfiguration(packages=["app"])
 
-    # Shared infrastructure container — holds the singleton FHIR HTTP client.
+    # Shared infrastructure container — holds the singleton FHIR HTTP client
+    # (the active connector) and the Terminology HTTP client.
     core = providers.Container(CoreContainer)
-
-    # Domain container for Patient resources.
-    # A Patient is a person receiving care or other health-related services.
-    # Includes sub-resource clients for names, identifiers, telecom, addresses,
-    # photos, contacts, communications, general practitioners, and links.
-    patient = providers.Container(
-        PatientContainer,
-        core=core,
-    )
-
-    # Domain container for Organization resources.
-    organization = providers.Container(
-        OrganizationContainer,
-        core=core,
-    )
-
-    # Domain container for Location resources. No longer depends on
-    # `organization` — managing_organization/part_of validation now lives
-    # entirely on fhir-server (see app/di/modules/location.py).
-    location = providers.Container(
-        LocationContainer,
-        core=core,
-    )
-
-    # Domain container for HealthcareService resources. No longer depends on
-    # `organization`/`location` — provided_by/location/coverage_area
-    # validation now lives entirely on fhir-server (see
-    # app/di/modules/healthcare_service.py). Kept declared in this position
-    # (after `location`) since PractitionerRoleContainer/ScheduleContainer
-    # below still reference `healthcare_service` as a sibling provider.
-    healthcare_service = providers.Container(
-        HealthcareServiceContainer,
-        core=core,
-    )
-
-    # Domain container for Practitioner resources. Must be declared after
-    # `organization` above since it references that provider by name —
-    # PractitionerService validates qualification.issuer references via
-    # OrganizationClient (see app/di/modules/practitioner.py).
-    practitioner = providers.Container(
-        PractitionerContainer,
-        core=core,
-        organization=organization,
-    )
-
-    # Domain container for PractitionerRole resources. No longer depends on
-    # `practitioner`/`organization`/`location`/`healthcare_service` —
-    # practitioner/organization/location[]/healthcare_service[] reference
-    # validation now lives entirely on fhir-server (see
-    # app/di/modules/practitioner_role.py). Kept declared in this position
-    # (after `practitioner`) since ScheduleContainer/SlotContainer below
-    # still reference `practitioner_role` as a sibling provider.
-    practitioner_role = providers.Container(
-        PractitionerRoleContainer,
-        core=core,
-    )
-
-    # Domain container for Schedule resources. Must be declared last —
-    # it references `practitioner`, `practitioner_role`, `location`,
-    # `healthcare_service`, and `patient` by name — ScheduleService
-    # validates actor references against all five and derives
-    # service_category/service_type/specialty from the PractitionerRole/
-    # HealthcareService actors (see app/di/modules/schedule.py).
-    schedule = providers.Container(
-        ScheduleContainer,
-        core=core,
-        practitioner=practitioner,
-        practitioner_role=practitioner_role,
-        location=location,
-        healthcare_service=healthcare_service,
-        patient=patient,
-    )
-
-    # Domain container for Slot resources. Must be declared after
-    # `schedule` and `practitioner_role` above since it references both
-    # providers by name — SlotService validates `schedule` references and
-    # reads the Schedule's PractitionerRole actor's availability for
-    # generate() (see app/di/modules/slot.py).
-    slot = providers.Container(
-        SlotContainer,
-        core=core,
-        schedule=schedule,
-        practitioner_role=practitioner_role,
-    )

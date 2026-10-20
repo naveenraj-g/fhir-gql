@@ -2,25 +2,22 @@
 Composes the GraphQL schema from per-domain Query/Mutation resolver mixins
 and exposes it as a FastAPI-mountable router.
 
-Every resource's Query/Mutation mixin is imported directly from its own
-`app/gql/<resource>/` package and mixed into the root Query/Mutation below.
-Organization is genuinely FHIR R4-shaped end-to-end (see
-app.gql.organization's package docstring) — its resolvers call the active
-connector directly and translate via
+Organization is the only FHIR resource this gateway exposes. It's
+genuinely FHIR R4-shaped end-to-end (see app.gql.organization's package
+docstring) — its resolvers call the active connector directly and
+translate via
 app.connectors.translator_registry.active_organization_translator(), keyed
-off `settings.connectors.active`, rather than going through a per-connector
-service/client layer the way the other resources below do. That's an
-internal implementation detail of app.gql.organization; from this module's
-point of view it's mixed in exactly the same way as every other resource.
+off `settings.connectors.active`, rather than going through a per-resource
+service/client layer.
 
-Adding a new resource to the GraphQL API means: write its
-`app/gql/<resource>/types/` + `queries.py` + `mutations.py`, then add its
-Query/Mutation mixin below.
+Adding a second resource means: write its `app/gql/<resource>/types/` +
+`queries.py` + `mutations.py` (and, if it needs its own translation layer,
+`app/connectors/<connector>/translators/<resource>.py` + a registry entry
+in app.connectors.translator_registry — see app.gql.organization's package
+docstring for the full pattern), then mix its Query/Mutation into the root
+types below the same way FhirOrganizationQuery/FhirOrganizationMutation are.
 
-GraphQL is this service's only transport — the REST routers that used to
-live in app/routers/ have been removed (app/schemas/ stays; every type
-below is still derived from those same Pydantic models, and REST can be
-rebuilt on top of them again later if needed).
+GraphQL is this service's only transport — there is no REST layer.
 """
 
 import strawberry
@@ -28,58 +25,22 @@ from strawberry.fastapi import GraphQLRouter
 
 from app.core.config import settings
 from app.gql.context import get_context
-from app.gql.healthcare_service.mutations import HealthcareServiceMutation
-from app.gql.healthcare_service.queries import HealthcareServiceQuery
-from app.gql.location.mutations import LocationMutation
-from app.gql.location.queries import LocationQuery
 from app.gql.logging import GqlLoggingExtension
 from app.gql.organization.mutations import FhirOrganizationMutation
 from app.gql.organization.queries import FhirOrganizationQuery
-from app.gql.patient.mutations import PatientMutation
-from app.gql.patient.queries import PatientQuery
-from app.gql.practitioner.mutations import PractitionerMutation
-from app.gql.practitioner.queries import PractitionerQuery
-from app.gql.practitioner_role.mutations import PractitionerRoleMutation
-from app.gql.practitioner_role.queries import PractitionerRoleQuery
-from app.gql.schedule.mutations import ScheduleMutation
-from app.gql.schedule.queries import ScheduleQuery
-from app.gql.slot.mutations import SlotMutation
-from app.gql.slot.queries import SlotQuery
 from app.gql.test_subscription import TestSubscription
 
 
 @strawberry.type
-class Query(
-    FhirOrganizationQuery,
-    PatientQuery,
-    LocationQuery,
-    HealthcareServiceQuery,
-    PractitionerQuery,
-    PractitionerRoleQuery,
-    ScheduleQuery,
-    SlotQuery,
-):
-    """
-    Root GraphQL query type — merges every domain's query fields via mixin
-    inheritance: `FhirOrganizationQuery`, `PatientQuery`, `LocationQuery`,
-    `HealthcareServiceQuery`, `PractitionerQuery`, `PractitionerRoleQuery`,
-    `ScheduleQuery`, and `SlotQuery`. Add further resources' Query mixins
-    here alongside them as they're added.
-    """
+class Query(FhirOrganizationQuery):
+    """Root GraphQL query type — merges every resource's query fields via
+    mixin inheritance. Add a new resource's Query mixin here alongside
+    `FhirOrganizationQuery` as it's added."""
 
 
 @strawberry.type
-class Mutation(
-    FhirOrganizationMutation,
-    PatientMutation,
-    LocationMutation,
-    HealthcareServiceMutation,
-    PractitionerMutation,
-    PractitionerRoleMutation,
-    ScheduleMutation,
-    SlotMutation,
-):
-    """Root GraphQL mutation type — merges every domain's mutation fields via mixin inheritance."""
+class Mutation(FhirOrganizationMutation):
+    """Root GraphQL mutation type — merges every resource's mutation fields via mixin inheritance."""
 
 
 @strawberry.type

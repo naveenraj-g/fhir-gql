@@ -174,7 +174,7 @@ def get_logger(name: str) -> logging.Logger:
 
     Wraps logging.getLogger so all modules obtain loggers the same way without
     importing the stdlib logging module directly. Pass __name__ as the argument
-    so log lines carry the full dotted module path (e.g. "app.services.organization_service").
+    so log lines carry the full dotted module path (e.g. "app.gql.organization.mutations").
 
     Args:
         name: Typically __name__ of the calling module.
@@ -189,21 +189,18 @@ def get_logger(name: str) -> logging.Logger:
 #
 # `logging.level: DEBUG` turns on an entry + exit line for EVERY public async
 # method of every @trace_methods-decorated class, so a single GraphQL
-# operation produces a complete top-to-bottom trace: resolver -> service
-# method -> client method -> FhirClient. At INFO those lines disappear and
-# only the per-operation line (app.gql.logging's GqlLoggingExtension) plus
-# the access log (app.middleware.access_log) remain.
+# operation produces a complete top-to-bottom trace: resolver -> connector
+# (InternalConnector/MedplumConnector) -> the underlying HTTP call. At INFO
+# those lines disappear and only the per-operation line (app.gql.logging's
+# GqlLoggingExtension) plus the access log (app.middleware.access_log)
+# remain.
 #
-# Applied as a class decorator on service classes (app/services/*.py) and
-# FHIR-client classes (app/fhir_client/*.py). It walks the full MRO, so a
-# method inherited from a base class is covered too — a new subclass method
-# needs no logging code of its own.
-#
-# Scope note: these classes are shared with the REST layer (app/routers/*.py
-# calls the exact same OrganizationsService/OrganizationClient instances the
-# GraphQL resolvers do), so a REST call incidentally gets traced too. That's
-# fine — it's not REST-specific instrumentation (no per-REST-route logging
-# was added), just visibility into code both layers already share.
+# Applied as a class decorator on the connector classes
+# (app.connectors.internal.client.InternalConnector,
+# app.connectors.medplum.client.MedplumConnector) and TerminologyClient
+# (app/fhir_client/terminology.py). It walks the full MRO, so a method
+# inherited from a base class is covered too — a new subclass method needs
+# no logging code of its own.
 
 
 def _redact(value: Any, redact_keys: set[str]) -> Any:
