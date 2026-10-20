@@ -15,8 +15,8 @@ rotation requires it (handled internally by python-jose's PyJWKClient).
 """
 
 import jwt
-from jwt import PyJWKClient
 from fastapi import Request
+from jwt import PyJWKClient
 
 from app.core.config import settings
 from app.errors.auth import AuthenticationError
