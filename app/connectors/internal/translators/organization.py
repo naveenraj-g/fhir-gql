@@ -15,16 +15,19 @@ A handful of fhir-server's flattened fallback fields have no canonical-FHIR
 source to translate from at all — `partof_identifier_*`, `assigner_identifier_*`,
 `reference_identifier_*` all exist to carry a Reference's *logical-identifier*
 fallback (used when there's nothing to resolve a real reference against), but
-app.connectors.internal.schemas.organization.fhir_schemas's
-FhirReference/FhirIdentifier.assigner don't model one. This translator simply
-never populates those — a known, narrower gap than full fhir-server-native
-write support, not a bug.
+app.fhir.schemas.datatypes' FhirReference/FhirIdentifier.assigner don't
+model one. This translator simply never populates those — a known,
+narrower gap than full fhir-server-native write support, not a bug.
 """
 
 
 def _coding(c: dict) -> dict:
     """FhirCoding -> OrganizationCodingInput-shaped dict."""
-    return {"system": c.get("system"), "code": c.get("code"), "display": c.get("display")}
+    return {
+        "system": c.get("system"),
+        "code": c.get("code"),
+        "display": c.get("display"),
+    }
 
 
 def _codeable_concept_to_type(cc: dict) -> dict:
@@ -154,7 +157,8 @@ def _organization_body(data: dict) -> dict:
         "partof": part_of.get("reference"),
         "partof_display": part_of.get("display"),
         "identifier": [_identifier(i) for i in (data.get("identifier") or [])] or None,
-        "type": [_codeable_concept_to_type(t) for t in (data.get("type") or [])] or None,
+        "type": [_codeable_concept_to_type(t) for t in (data.get("type") or [])]
+        or None,
         "alias": [{"value": a} for a in (data.get("alias") or [])] or None,
         "telecom": [_telecom(t) for t in (data.get("telecom") or [])] or None,
         "address": [_address(a) for a in (data.get("address") or [])] or None,
@@ -178,13 +182,51 @@ class InternalOrganizationTranslator:
         return "/organizations"
 
     def list_params(
-        self, name: str | None, active: bool | None, limit: int, offset: int
+        self,
+        name: str | None,
+        active: bool | None,
+        identifier: str | None,
+        org_type: str | None,
+        address: str | None,
+        address_city: str | None,
+        address_state: str | None,
+        address_postal_code: str | None,
+        address_country: str | None,
+        address_use: str | None,
+        partof: str | None,
+        endpoint: str | None,
+        limit: int,
+        offset: int,
     ) -> dict:
+        """fhir-server's own router already aliases every one of its query
+        params to the real FHIR R4 search parameter name (address-city,
+        address-postalcode, ...) — see app/routers/organization/core.py in
+        that project — so this is a 1:1 rename, not a translation."""
         params: dict = {"limit": limit, "offset": offset}
         if name is not None:
             params["name"] = name
         if active is not None:
             params["active"] = active
+        if identifier is not None:
+            params["identifier"] = identifier
+        if org_type is not None:
+            params["type"] = org_type
+        if address is not None:
+            params["address"] = address
+        if address_city is not None:
+            params["address-city"] = address_city
+        if address_state is not None:
+            params["address-state"] = address_state
+        if address_postal_code is not None:
+            params["address-postalcode"] = address_postal_code
+        if address_country is not None:
+            params["address-country"] = address_country
+        if address_use is not None:
+            params["address-use"] = address_use
+        if partof is not None:
+            params["partof"] = partof
+        if endpoint is not None:
+            params["endpoint"] = endpoint
         return params
 
     def from_wire(self, raw: dict) -> dict:

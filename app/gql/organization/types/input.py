@@ -2,10 +2,10 @@
 GraphQL input types for the Organization resource.
 
 Object (output) types and input types are declared from the same
-underlying Pydantic models (app.connectors.internal.schemas.organization.
-fhir_schemas) but are two distinct sets of strawberry classes — GraphQL
-itself requires separate Input types, they can't be reused as plain object
-types or vice versa. Declaration order matters for
+underlying Pydantic models (app.fhir.schemas.datatypes +
+app.fhir.schemas.organization) but are two distinct sets of strawberry
+classes — GraphQL itself requires separate Input types, they can't be
+reused as plain object types or vice versa. Declaration order matters for
 strawberry.experimental.pydantic: leaf types before the parent model that
 references them.
 """
@@ -13,18 +13,18 @@ references them.
 import strawberry
 from strawberry.scalars import JSON
 
-from app.connectors.internal.schemas.organization.fhir_schemas import (
+from app.fhir.schemas.datatypes import (
     FhirAddress,
     FhirCodeableConcept,
     FhirCoding,
     FhirContactPoint,
     FhirHumanName,
     FhirIdentifier,
-    FhirOrgContact,
     FhirPeriod,
     FhirReference,
 )
-from app.connectors.internal.schemas.organization.fhir_schemas import (
+from app.fhir.schemas.organization import FhirOrgContact
+from app.fhir.schemas.organization import (
     FhirOrganizationInput as FhirOrganizationInputSchema,
 )
 

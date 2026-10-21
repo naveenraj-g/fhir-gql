@@ -124,9 +124,26 @@ class OrganizationWireTranslator(Protocol):
         ...
 
     def list_params(
-        self, name: str | None, active: bool | None, limit: int, offset: int
+        self,
+        name: str | None,
+        active: bool | None,
+        identifier: str | None,
+        org_type: str | None,
+        address: str | None,
+        address_city: str | None,
+        address_state: str | None,
+        address_postal_code: str | None,
+        address_country: str | None,
+        address_use: str | None,
+        partof: str | None,
+        endpoint: str | None,
+        limit: int,
+        offset: int,
     ) -> dict:
-        """Canonical filter/pagination args -> this backend's own query param names."""
+        """Canonical filter/pagination args -> this backend's own query param
+        names. The filter set mirrors FHIR R4's own Organization search
+        parameters (https://hl7.org/fhir/R4/organization.html#search) minus
+        `phonetic` — neither backend implements phonetic matching today."""
         ...
 
     def from_wire(self, raw: dict) -> dict:

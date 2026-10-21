@@ -14,18 +14,18 @@ before the parent model that references them.
 import strawberry
 from strawberry.scalars import JSON
 
-from app.connectors.internal.schemas.organization.fhir_schemas import (
+from app.fhir.schemas.datatypes import (
     FhirAddress,
     FhirCodeableConcept,
     FhirCoding,
     FhirContactPoint,
     FhirHumanName,
     FhirIdentifier,
-    FhirOrgContact,
-    FhirOrgResponse,
+    FhirMeta,
     FhirPeriod,
     FhirReference,
 )
+from app.fhir.schemas.organization import FhirOrgContact, FhirOrgResponse
 
 # ── Leaf sub-resources first ─────────────────────────────────────────────────
 
@@ -44,6 +44,21 @@ class FhirCodingType:
 )
 class FhirCodeableConceptType:
     """A single CodeableConcept."""
+
+
+@strawberry.experimental.pydantic.type(
+    model=FhirMeta,
+    all_fields=True,
+    description=(
+        "Infrastructure-maintained resource metadata — lastUpdated, plus "
+        "org_id/created_by/updated_by/created_at carried as extensions "
+        "since FHIR R4's Meta has no native field for those."
+    ),
+)
+class FhirMetaType:
+    """Infrastructure-maintained resource metadata."""
+
+    extension: JSON | None
 
 
 @strawberry.experimental.pydantic.type(

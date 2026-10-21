@@ -11,8 +11,8 @@ from typing import Annotated
 
 import strawberry
 
-from app.connectors.internal.schemas.organization.fhir_schemas import FhirOrgResponse
 from app.connectors.translator_registry import active_organization_translator
+from app.fhir.schemas.organization import FhirOrgResponse
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
 from app.gql.organization.types.input import FhirOrganizationInput
