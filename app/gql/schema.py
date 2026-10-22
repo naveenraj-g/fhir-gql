@@ -2,20 +2,24 @@
 Composes the GraphQL schema from per-domain Query/Mutation resolver mixins
 and exposes it as a FastAPI-mountable router.
 
-Organization is the only FHIR resource this gateway exposes. It's
-genuinely FHIR R4-shaped end-to-end (see app.gql.organization's package
-docstring) — its resolvers call the active connector directly and
-translate via
-app.connectors.translator_registry.active_organization_translator(), keyed
+Organization, Location, and HealthcareService are the FHIR resources this
+gateway exposes. All three are genuinely FHIR R4-shaped end-to-end (see
+app.gql.organization's package docstring, which app.gql.location and
+app.gql.healthcare_service both mirror exactly) — their resolvers call the
+active connector directly and translate via
+app.connectors.translator_registry.active_organization_translator()/
+active_location_translator()/active_healthcare_service_translator(), keyed
 off `settings.connectors.active`, rather than going through a per-resource
 service/client layer.
 
-Adding a second resource means: write its `app/gql/<resource>/types/` +
+Adding another resource means: write its `app/gql/<resource>/types/` +
 `queries.py` + `mutations.py` (and, if it needs its own translation layer,
 `app/connectors/<connector>/translators/<resource>.py` + a registry entry
 in app.connectors.translator_registry — see app.gql.organization's package
 docstring for the full pattern), then mix its Query/Mutation into the root
-types below the same way FhirOrganizationQuery/FhirOrganizationMutation are.
+types below the same way FhirOrganizationQuery/FhirOrganizationMutation,
+FhirLocationQuery/FhirLocationMutation, and
+FhirHealthcareServiceQuery/FhirHealthcareServiceMutation are.
 
 GraphQL is this service's only transport — there is no REST layer.
 """
@@ -25,6 +29,10 @@ from strawberry.fastapi import GraphQLRouter
 
 from app.core.config import settings
 from app.gql.context import get_context
+from app.gql.healthcare_service.mutations import FhirHealthcareServiceMutation
+from app.gql.healthcare_service.queries import FhirHealthcareServiceQuery
+from app.gql.location.mutations import FhirLocationMutation
+from app.gql.location.queries import FhirLocationQuery
 from app.gql.logging import GqlLoggingExtension
 from app.gql.organization.mutations import FhirOrganizationMutation
 from app.gql.organization.queries import FhirOrganizationQuery
@@ -32,14 +40,17 @@ from app.gql.test_subscription import TestSubscription
 
 
 @strawberry.type
-class Query(FhirOrganizationQuery):
+class Query(FhirOrganizationQuery, FhirLocationQuery, FhirHealthcareServiceQuery):
     """Root GraphQL query type — merges every resource's query fields via
     mixin inheritance. Add a new resource's Query mixin here alongside
-    `FhirOrganizationQuery` as it's added."""
+    `FhirOrganizationQuery`/`FhirLocationQuery`/`FhirHealthcareServiceQuery`
+    as it's added."""
 
 
 @strawberry.type
-class Mutation(FhirOrganizationMutation):
+class Mutation(
+    FhirOrganizationMutation, FhirLocationMutation, FhirHealthcareServiceMutation
+):
     """Root GraphQL mutation type — merges every resource's mutation fields via mixin inheritance."""
 
 

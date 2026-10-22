@@ -161,3 +161,140 @@ class OrganizationWireTranslator(Protocol):
         """Canonical FHIR Organization dict (from FhirOrganizationInput) ->
         this backend's own PATCH-update body shape."""
         ...
+
+
+class LocationWireTranslator(Protocol):
+    """
+    One connector's read/write wire conventions for the canonical FHIR R4
+    Location shape used by app.gql.location — same structural pattern as
+    OrganizationWireTranslator above, see that class's docstring for the
+    overall rationale.
+
+    Which connector's translator is active is resolved by
+    app.connectors.translator_registry.active_location_translator(), keyed
+    off the same `connectors.active` config value as `Connector` itself.
+
+    Location has no top-level `active` field (unlike Organization), so
+    there's no `active` filter in list_params below. There is also no
+    `physical_type` filter, deliberately — physicalType is a real Location
+    field, but it was never a registered FHIR R4 SearchParameter for
+    Location, so it's excluded to keep this filter set exactly the real 15
+    R4 search parameters: https://hl7.org/fhir/R4/location.html#search.
+    """
+
+    accept: str | None
+
+    def item_path(self, location_id: str) -> str:
+        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
+        ...
+
+    def list_path(self) -> str:
+        """Path for GET-collection (search) and POST-create, in this
+        backend's own convention."""
+        ...
+
+    def list_params(
+        self,
+        name: str | None,
+        identifier: str | None,
+        status: str | None,
+        operational_status: str | None,
+        location_type: str | None,
+        address: str | None,
+        address_city: str | None,
+        address_state: str | None,
+        address_postal_code: str | None,
+        address_country: str | None,
+        address_use: str | None,
+        organization: str | None,
+        partof: str | None,
+        endpoint: str | None,
+        near: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict:
+        """Canonical filter/pagination args -> this backend's own query
+        param names. The filter set mirrors FHIR R4's own Location search
+        parameters (https://hl7.org/fhir/R4/location.html#search)."""
+        ...
+
+    def from_wire(self, raw: dict) -> dict:
+        """This backend's raw response dict -> canonical FHIR Location
+        (or Bundle) dict. Identity for both connectors today."""
+        ...
+
+    def to_wire_create(self, data: dict) -> dict:
+        """Canonical FHIR Location dict (from FhirLocationInput) -> this
+        backend's own POST-create body shape."""
+        ...
+
+    def to_wire_patch(self, data: dict) -> dict:
+        """Canonical FHIR Location dict (from FhirLocationInput) -> this
+        backend's own PATCH-update body shape."""
+        ...
+
+
+class HealthcareServiceWireTranslator(Protocol):
+    """
+    One connector's read/write wire conventions for the canonical FHIR R4
+    HealthcareService shape used by app.gql.healthcare_service — same
+    structural pattern as OrganizationWireTranslator/LocationWireTranslator
+    above, see OrganizationWireTranslator's docstring for the overall
+    rationale.
+
+    Which connector's translator is active is resolved by
+    app.connectors.translator_registry.active_healthcare_service_translator(),
+    keyed off the same `connectors.active` config value as `Connector`
+    itself.
+    """
+
+    accept: str | None
+
+    def item_path(self, healthcare_service_id: str) -> str:
+        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
+        ...
+
+    def list_path(self) -> str:
+        """Path for GET-collection (search) and POST-create, in this
+        backend's own convention."""
+        ...
+
+    def list_params(
+        self,
+        name: str | None,
+        identifier: str | None,
+        active: bool | None,
+        category: str | None,
+        service_type: str | None,
+        specialty: str | None,
+        characteristic: str | None,
+        program: str | None,
+        organization: str | None,
+        location: str | None,
+        coverage_area: str | None,
+        endpoint: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict:
+        """Canonical filter/pagination args -> this backend's own query
+        param names. The filter set mirrors FHIR R4's own HealthcareService
+        search parameters (https://hl7.org/fhir/R4/healthcareservice.html#search)."""
+        ...
+
+    def from_wire(self, raw: dict) -> dict:
+        """This backend's raw response dict -> canonical FHIR
+        HealthcareService (or Bundle) dict. Identity for both connectors
+        today."""
+        ...
+
+    def to_wire_create(self, data: dict) -> dict:
+        """Canonical FHIR HealthcareService dict (from
+        FhirHealthcareServiceInput) -> this backend's own POST-create body
+        shape."""
+        ...
+
+    def to_wire_patch(self, data: dict) -> dict:
+        """Canonical FHIR HealthcareService dict (from
+        FhirHealthcareServiceInput) -> this backend's own PATCH-update body
+        shape."""
+        ...

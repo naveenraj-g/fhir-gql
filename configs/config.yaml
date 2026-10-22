@@ -28,7 +28,7 @@ connectors:
   # connector's name here once one is registered in
   # app/connectors/registry.py. Each connector's own settings (base_url,
   # auth_mode, ...) live in configs/connectors/<name>.yaml, not here.
-  active: medplum
+  active: internal
 
 cors:
   # No CORSMiddleware is registered at all while this is false.
