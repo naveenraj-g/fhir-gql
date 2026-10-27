@@ -9,6 +9,7 @@ app.fhir.schemas.organization for the pattern.
 """
 
 from app.fhir.schemas.datatypes.address import FhirAddress
+from app.fhir.schemas.datatypes.attachment import FhirAttachment
 from app.fhir.schemas.datatypes.codeable_concept import FhirCodeableConcept
 from app.fhir.schemas.datatypes.coding import FhirCoding
 from app.fhir.schemas.datatypes.contact_point import FhirContactPoint
@@ -20,6 +21,7 @@ from app.fhir.schemas.datatypes.reference import FhirReference
 
 __all__ = [
     "FhirAddress",
+    "FhirAttachment",
     "FhirCodeableConcept",
     "FhirCoding",
     "FhirContactPoint",

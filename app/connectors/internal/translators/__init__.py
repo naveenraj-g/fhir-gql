@@ -17,9 +17,21 @@ from app.connectors.internal.translators.location import InternalLocationTransla
 from app.connectors.internal.translators.organization import (
     InternalOrganizationTranslator,
 )
+from app.connectors.internal.translators.practitioner import (
+    InternalPractitionerTranslator,
+)
+from app.connectors.internal.translators.practitioner_role import (
+    InternalPractitionerRoleTranslator,
+)
+from app.connectors.internal.translators.schedule import InternalScheduleTranslator
+from app.connectors.internal.translators.slot import InternalSlotTranslator
 
 __all__ = [
     "InternalHealthcareServiceTranslator",
     "InternalLocationTranslator",
     "InternalOrganizationTranslator",
+    "InternalPractitionerTranslator",
+    "InternalPractitionerRoleTranslator",
+    "InternalScheduleTranslator",
+    "InternalSlotTranslator",
 ]

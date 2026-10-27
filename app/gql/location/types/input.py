@@ -14,6 +14,7 @@ would conflict rather than add anything.
 """
 
 import strawberry
+from strawberry.scalars import JSON
 
 # Importing app.gql.organization.types.input ensures FhirIdentifierInput/
 # FhirCodeableConceptInput/FhirContactPointInput/FhirAddressInput/
@@ -60,3 +61,7 @@ class FhirLocationHoursOfOperationInput:
 )
 class FhirLocationInput:
     """Input for createFhirLocation/updateFhirLocation."""
+
+    # dict isn't a native GraphQL scalar — must be overridden explicitly as
+    # the JSON scalar, same as Organization's own extension/assigner fields.
+    extension: JSON | None = None

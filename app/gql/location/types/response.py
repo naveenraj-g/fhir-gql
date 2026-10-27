@@ -19,6 +19,7 @@ what is structurally one Pydantic model.
 """
 
 import strawberry
+from strawberry.scalars import JSON
 
 # Importing app.gql.organization.types.response (even without using its
 # names directly) ensures FhirCodingType/FhirCodeableConceptType/
@@ -69,3 +70,7 @@ class FhirLocationHoursOfOperationType:
 )
 class FhirLocationType:
     """A full FHIR R4 Location resource."""
+
+    # dict isn't a native GraphQL scalar — must be overridden explicitly as
+    # the JSON scalar, same as Organization's own extension/assigner fields.
+    extension: JSON | None

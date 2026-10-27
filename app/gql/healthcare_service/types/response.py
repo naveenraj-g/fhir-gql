@@ -20,6 +20,7 @@ structurally one Pydantic model.
 """
 
 import strawberry
+from strawberry.scalars import JSON
 
 from app.fhir.schemas.healthcare_service import (
     FhirAttachment,
@@ -85,3 +86,7 @@ class FhirHealthcareServiceNotAvailableType:
 )
 class FhirHealthcareServiceType:
     """A full FHIR R4 HealthcareService resource."""
+
+    # dict isn't a native GraphQL scalar — must be overridden explicitly as
+    # the JSON scalar, same as Organization's own extension/assigner fields.
+    extension: JSON | None

@@ -7,8 +7,12 @@ Location).
 
 Medplum is genuinely FHIR-native, so canonical path/params/body ARE its
 real path/params/body — a pure pass-through in every direction, same as
-the Organization translator.
+the Organization translator. The one exception is `to_wire_patch` — see
+app.connectors.medplum.json_patch's docstring for why PATCH can't be a
+pass-through here either.
 """
+
+from app.connectors.medplum.json_patch import to_json_patch
 
 
 class MedplumLocationTranslator:
@@ -85,5 +89,5 @@ class MedplumLocationTranslator:
     def to_wire_create(self, data: dict) -> dict:
         return {"resourceType": "Location", **data}
 
-    def to_wire_patch(self, data: dict) -> dict:
-        return {"resourceType": "Location", **data}
+    def to_wire_patch(self, data: dict) -> list[dict]:
+        return to_json_patch(data)

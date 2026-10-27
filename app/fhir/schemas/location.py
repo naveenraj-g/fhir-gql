@@ -100,6 +100,10 @@ class FhirLocationResponse(BaseModel):
             "data, not something a client writes."
         ),
     )
+    extension: list[dict] | None = Field(
+        default=None,
+        description="Resource-level FHIR extensions, as raw [{url, valueType, value}, ...] entries",
+    )
     identifier: list[FhirIdentifier] | None = Field(
         default=None,
         description="Unique code or number identifying the location to its users",
@@ -202,6 +206,7 @@ class FhirLocationInput(BaseModel):
     simply left unset by that translator, same gap as Organization's.
     """
 
+    extension: list[dict] | None = Field(default=None)
     identifier: list[FhirIdentifier] | None = Field(default=None)
     status: str | None = Field(default=None)
     operationalStatus: FhirCoding | None = Field(default=None)

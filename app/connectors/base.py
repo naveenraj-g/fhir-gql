@@ -69,12 +69,16 @@ class Connector(Protocol):
     async def patch(
         self,
         path: str,
-        data: dict,
+        data: dict | list[dict],
         actor: AuthUser,
         accept: str | None = None,
         inject_audit: bool = True,
     ) -> dict:
-        """Partially update the resource at `path`."""
+        """Partially update the resource at `path`. `data` is whatever
+        shape this connector's own PATCH convention needs — a plain
+        partial-fields dict (fhir-server's InternalConnector) or an RFC
+        6902 JSON Patch array (MedplumConnector) — see each connector's
+        own translator's `to_wire_patch()`."""
         ...
 
     async def delete(self, path: str, actor: AuthUser | None = None) -> None:
@@ -157,7 +161,7 @@ class OrganizationWireTranslator(Protocol):
         this backend's own POST-create body shape."""
         ...
 
-    def to_wire_patch(self, data: dict) -> dict:
+    def to_wire_patch(self, data: dict) -> dict | list[dict]:
         """Canonical FHIR Organization dict (from FhirOrganizationInput) ->
         this backend's own PATCH-update body shape."""
         ...
@@ -228,7 +232,7 @@ class LocationWireTranslator(Protocol):
         backend's own POST-create body shape."""
         ...
 
-    def to_wire_patch(self, data: dict) -> dict:
+    def to_wire_patch(self, data: dict) -> dict | list[dict]:
         """Canonical FHIR Location dict (from FhirLocationInput) -> this
         backend's own PATCH-update body shape."""
         ...
@@ -293,8 +297,262 @@ class HealthcareServiceWireTranslator(Protocol):
         shape."""
         ...
 
-    def to_wire_patch(self, data: dict) -> dict:
+    def to_wire_patch(self, data: dict) -> dict | list[dict]:
         """Canonical FHIR HealthcareService dict (from
         FhirHealthcareServiceInput) -> this backend's own PATCH-update body
         shape."""
+        ...
+
+
+class PractitionerWireTranslator(Protocol):
+    """
+    One connector's read/write wire conventions for the canonical FHIR R4
+    Practitioner shape used by app.gql.practitioner — same structural
+    pattern as OrganizationWireTranslator/LocationWireTranslator/
+    HealthcareServiceWireTranslator above, see OrganizationWireTranslator's
+    docstring for the overall rationale.
+
+    Which connector's translator is active is resolved by
+    app.connectors.translator_registry.active_practitioner_translator(),
+    keyed off the same `connectors.active` config value as `Connector`
+    itself.
+    """
+
+    accept: str | None
+
+    def item_path(self, practitioner_id: str) -> str:
+        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
+        ...
+
+    def list_path(self) -> str:
+        """Path for GET-collection (search) and POST-create, in this
+        backend's own convention."""
+        ...
+
+    def list_params(
+        self,
+        name: str | None,
+        family: str | None,
+        given: str | None,
+        identifier: str | None,
+        active: bool | None,
+        gender: str | None,
+        communication: str | None,
+        telecom: str | None,
+        phone: str | None,
+        email: str | None,
+        address: str | None,
+        address_city: str | None,
+        address_state: str | None,
+        address_postal_code: str | None,
+        address_country: str | None,
+        address_use: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict:
+        """Canonical filter/pagination args -> this backend's own query
+        param names. The filter set mirrors FHIR R4's own Practitioner
+        search parameters (https://hl7.org/fhir/R4/practitioner.html#search)
+        minus `phonetic` — neither backend implements phonetic matching
+        today, same exclusion as OrganizationWireTranslator's."""
+        ...
+
+    def from_wire(self, raw: dict) -> dict:
+        """This backend's raw response dict -> canonical FHIR Practitioner
+        (or Bundle) dict. Identity for both connectors today."""
+        ...
+
+    def to_wire_create(self, data: dict) -> dict:
+        """Canonical FHIR Practitioner dict (from FhirPractitionerInput) ->
+        this backend's own POST-create body shape."""
+        ...
+
+    def to_wire_patch(self, data: dict) -> dict | list[dict]:
+        """Canonical FHIR Practitioner dict (from FhirPractitionerInput) ->
+        this backend's own PATCH-update body shape."""
+        ...
+
+
+class PractitionerRoleWireTranslator(Protocol):
+    """
+    One connector's read/write wire conventions for the canonical FHIR R4
+    PractitionerRole shape used by app.gql.practitioner_role — same
+    structural pattern as OrganizationWireTranslator/LocationWireTranslator/
+    HealthcareServiceWireTranslator/PractitionerWireTranslator above, see
+    OrganizationWireTranslator's docstring for the overall rationale.
+
+    Which connector's translator is active is resolved by
+    app.connectors.translator_registry.active_practitioner_role_translator(),
+    keyed off the same `connectors.active` config value as `Connector`
+    itself.
+    """
+
+    accept: str | None
+
+    def item_path(self, practitioner_role_id: str) -> str:
+        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
+        ...
+
+    def list_path(self) -> str:
+        """Path for GET-collection (search) and POST-create, in this
+        backend's own convention."""
+        ...
+
+    def list_params(
+        self,
+        active: bool | None,
+        identifier: str | None,
+        code: str | None,
+        specialty: str | None,
+        practitioner: str | None,
+        organization: str | None,
+        location: str | None,
+        healthcare_service: str | None,
+        endpoint: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict:
+        """Canonical filter/pagination args -> this backend's own query
+        param names. The filter set mirrors FHIR R4's own PractitionerRole
+        search parameters
+        (https://hl7.org/fhir/R4/practitionerrole.html#search) minus `date`
+        — neither backend implements an `active`-period-range search today,
+        and PractitionerRole's own `period` already carries that via
+        `active` + the resource's own start/end."""
+        ...
+
+    def from_wire(self, raw: dict) -> dict:
+        """This backend's raw response dict -> canonical FHIR
+        PractitionerRole (or Bundle) dict. Identity for both connectors
+        today."""
+        ...
+
+    def to_wire_create(self, data: dict) -> dict:
+        """Canonical FHIR PractitionerRole dict (from
+        FhirPractitionerRoleInput) -> this backend's own POST-create body
+        shape."""
+        ...
+
+    def to_wire_patch(self, data: dict) -> dict | list[dict]:
+        """Canonical FHIR PractitionerRole dict (from
+        FhirPractitionerRoleInput) -> this backend's own PATCH-update body
+        shape."""
+        ...
+
+
+class ScheduleWireTranslator(Protocol):
+    """
+    One connector's read/write wire conventions for the canonical FHIR R4
+    Schedule shape used by app.gql.schedule — same structural pattern as
+    OrganizationWireTranslator/LocationWireTranslator/
+    HealthcareServiceWireTranslator/PractitionerWireTranslator/
+    PractitionerRoleWireTranslator above, see OrganizationWireTranslator's
+    docstring for the overall rationale.
+
+    Which connector's translator is active is resolved by
+    app.connectors.translator_registry.active_schedule_translator(), keyed
+    off the same `connectors.active` config value as `Connector` itself.
+    """
+
+    accept: str | None
+
+    def item_path(self, schedule_id: str) -> str:
+        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
+        ...
+
+    def list_path(self) -> str:
+        """Path for GET-collection (search) and POST-create, in this
+        backend's own convention."""
+        ...
+
+    def list_params(
+        self,
+        active: bool | None,
+        identifier: str | None,
+        service_category: str | None,
+        service_type: str | None,
+        specialty: str | None,
+        actor: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict:
+        """Canonical filter/pagination args -> this backend's own query
+        param names. The filter set mirrors FHIR R4's own Schedule search
+        parameters (https://hl7.org/fhir/R4/schedule.html#search) minus
+        `date` — neither backend implements an `active`-period-range
+        search today."""
+        ...
+
+    def from_wire(self, raw: dict) -> dict:
+        """This backend's raw response dict -> canonical FHIR Schedule (or
+        Bundle) dict. Identity for both connectors today."""
+        ...
+
+    def to_wire_create(self, data: dict) -> dict:
+        """Canonical FHIR Schedule dict (from FhirScheduleInput) -> this
+        backend's own POST-create body shape."""
+        ...
+
+    def to_wire_patch(self, data: dict) -> dict | list[dict]:
+        """Canonical FHIR Schedule dict (from FhirScheduleInput) -> this
+        backend's own PATCH-update body shape."""
+        ...
+
+
+class SlotWireTranslator(Protocol):
+    """
+    One connector's read/write wire conventions for the canonical FHIR R4
+    Slot shape used by app.gql.slot — same structural pattern as
+    OrganizationWireTranslator/LocationWireTranslator/
+    HealthcareServiceWireTranslator/PractitionerWireTranslator/
+    PractitionerRoleWireTranslator/ScheduleWireTranslator above, see
+    OrganizationWireTranslator's docstring for the overall rationale.
+
+    Which connector's translator is active is resolved by
+    app.connectors.translator_registry.active_slot_translator(), keyed
+    off the same `connectors.active` config value as `Connector` itself.
+    """
+
+    accept: str | None
+
+    def item_path(self, slot_id: str) -> str:
+        """Path for GET-by-id/PATCH/DELETE, in this backend's own convention."""
+        ...
+
+    def list_path(self) -> str:
+        """Path for GET-collection (search) and POST-create, in this
+        backend's own convention."""
+        ...
+
+    def list_params(
+        self,
+        status: str | None,
+        identifier: str | None,
+        service_category: str | None,
+        service_type: str | None,
+        specialty: str | None,
+        schedule: str | None,
+        limit: int,
+        offset: int,
+    ) -> dict:
+        """Canonical filter/pagination args -> this backend's own query
+        param names. The filter set mirrors FHIR R4's own Slot search
+        parameters (https://hl7.org/fhir/R4/slot.html#search) minus
+        `start` — neither backend implements a date-range search on this
+        today."""
+        ...
+
+    def from_wire(self, raw: dict) -> dict:
+        """This backend's raw response dict -> canonical FHIR Slot (or
+        Bundle) dict. Identity for both connectors today."""
+        ...
+
+    def to_wire_create(self, data: dict) -> dict:
+        """Canonical FHIR Slot dict (from FhirSlotInput) -> this backend's
+        own POST-create body shape."""
+        ...
+
+    def to_wire_patch(self, data: dict) -> dict | list[dict]:
+        """Canonical FHIR Slot dict (from FhirSlotInput) -> this backend's
+        own PATCH-update body shape."""
         ...

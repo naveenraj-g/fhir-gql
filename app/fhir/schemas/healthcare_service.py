@@ -13,11 +13,11 @@ FhirCodeableConcept.coding is already a real 0..* list — there is no
 per-field flattening to work around here the way Organization/Location
 needed historically.
 
-`FhirAttachment`, `FhirHealthcareServiceEligibility`,
-`FhirHealthcareServiceAvailableTime`, and `FhirHealthcareServiceNotAvailable`
-stay local: each is HealthcareService's own anonymous BackboneElement/
-datatype shape (Attachment is a general FHIR datatype, but nothing else in
-this gateway has needed it yet), not reused across other resources.
+`FhirAttachment` now lives in app.fhir.schemas.datatypes (promoted there once
+Practitioner.photo needed the same shape — see that package's docstring).
+`FhirHealthcareServiceEligibility`, `FhirHealthcareServiceAvailableTime`, and
+`FhirHealthcareServiceNotAvailable` stay local: each is HealthcareService's
+own anonymous BackboneElement shape, not reused across other resources.
 
 `FhirHealthcareServiceInput` is the write-side counterpart, used by both
 createFhirHealthcareService/updateFhirHealthcareService (see
@@ -30,6 +30,7 @@ https://hl7.org/fhir/R4/healthcareservice.html
 from pydantic import BaseModel, Field
 
 from app.fhir.schemas.datatypes import (
+    FhirAttachment,
     FhirCodeableConcept,
     FhirContactPoint,
     FhirIdentifier,
@@ -37,34 +38,6 @@ from app.fhir.schemas.datatypes import (
     FhirPeriod,
     FhirReference,
 )
-
-
-class FhirAttachment(BaseModel):
-    """HealthcareService.photo (0..1 Attachment)."""
-
-    contentType: str | None = Field(
-        default=None, description="Mime type of the content, e.g. image/png"
-    )
-    language: str | None = Field(
-        default=None, description="Human language of the content, as a BCP-47 code"
-    )
-    data: str | None = Field(default=None, description="The actual data, base64-encoded")
-    url: str | None = Field(
-        default=None, description="A URI where the data can be found instead of inline"
-    )
-    size: int | None = Field(
-        default=None,
-        description="Number of bytes of content, measured after decoding, if applicable",
-    )
-    hash: str | None = Field(
-        default=None, description="Base64-encoded hash (SHA-1) of the data"
-    )
-    title: str | None = Field(
-        default=None, description="Label to display in place of the content"
-    )
-    creation: str | None = Field(
-        default=None, description="ISO 8601 datetime the attachment was first created"
-    )
 
 
 class FhirHealthcareServiceEligibility(BaseModel):
@@ -124,6 +97,10 @@ class FhirHealthcareServiceResponse(BaseModel):
             "FhirHealthcareServiceInput, since this is server-derived "
             "audit/tenant data, not something a client writes."
         ),
+    )
+    extension: list[dict] | None = Field(
+        default=None,
+        description="Resource-level FHIR extensions, as raw [{url, valueType, value}, ...] entries",
     )
     identifier: list[FhirIdentifier] | None = Field(
         default=None, description="External identifiers for this item"
@@ -227,6 +204,7 @@ class FhirHealthcareServiceInput(BaseModel):
     `meta`. Used as-is for BOTH create and update — see module docstring.
     """
 
+    extension: list[dict] | None = Field(default=None)
     identifier: list[FhirIdentifier] | None = Field(default=None)
     active: bool | None = Field(default=None)
     providedBy: FhirReference | None = Field(default=None)

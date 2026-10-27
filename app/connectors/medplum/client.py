@@ -139,13 +139,27 @@ class MedplumConnector:
     async def patch(
         self,
         path: str,
-        data: dict,
+        data: dict | list[dict],
         actor: AuthUser,
         accept: str | None = None,
         inject_audit: bool = True,
     ) -> dict:
-        """Send a PATCH (partial update) request to Medplum."""
-        r = await self._request("PATCH", path, json=data)
+        """Send a PATCH (partial update) request to Medplum.
+
+        `data` is a JSON Patch (RFC 6902) array by the time it reaches here
+        — see app.connectors.medplum.json_patch.to_json_patch(), which
+        every translator's to_wire_patch() now goes through. Medplum
+        rejects a plain resource body for PATCH outright (400 "Invalid
+        patch body"), and FHIR R4's PATCH interaction itself doesn't accept
+        one either — the client's default Content-Type
+        (application/fhir+json, set at construction for every other verb)
+        is overridden here specifically, since JSON Patch has its own
+        distinct media type.
+        """
+        r = await self._request(
+            "PATCH", path, json=data,
+            headers={"Content-Type": "application/json-patch+json"},
+        )
         return await self._handle(r)
 
     async def get(

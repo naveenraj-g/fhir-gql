@@ -2,14 +2,18 @@
 Composes the GraphQL schema from per-domain Query/Mutation resolver mixins
 and exposes it as a FastAPI-mountable router.
 
-Organization, Location, and HealthcareService are the FHIR resources this
-gateway exposes. All three are genuinely FHIR R4-shaped end-to-end (see
-app.gql.organization's package docstring, which app.gql.location and
-app.gql.healthcare_service both mirror exactly) — their resolvers call the
-active connector directly and translate via
+Organization, Location, HealthcareService, Practitioner,
+PractitionerRole, Schedule, and Slot are the FHIR resources this gateway
+exposes. All seven are genuinely FHIR R4-shaped end-to-end (see
+app.gql.organization's package docstring, which app.gql.location,
+app.gql.healthcare_service, app.gql.practitioner, app.gql.practitioner_role,
+app.gql.schedule, and app.gql.slot all mirror exactly) — their resolvers
+call the active connector directly and translate via
 app.connectors.translator_registry.active_organization_translator()/
-active_location_translator()/active_healthcare_service_translator(), keyed
-off `settings.connectors.active`, rather than going through a per-resource
+active_location_translator()/active_healthcare_service_translator()/
+active_practitioner_translator()/active_practitioner_role_translator()/
+active_schedule_translator()/active_slot_translator(), keyed off
+`settings.connectors.active`, rather than going through a per-resource
 service/client layer.
 
 Adding another resource means: write its `app/gql/<resource>/types/` +
@@ -18,8 +22,12 @@ Adding another resource means: write its `app/gql/<resource>/types/` +
 in app.connectors.translator_registry — see app.gql.organization's package
 docstring for the full pattern), then mix its Query/Mutation into the root
 types below the same way FhirOrganizationQuery/FhirOrganizationMutation,
-FhirLocationQuery/FhirLocationMutation, and
-FhirHealthcareServiceQuery/FhirHealthcareServiceMutation are.
+FhirLocationQuery/FhirLocationMutation,
+FhirHealthcareServiceQuery/FhirHealthcareServiceMutation,
+FhirPractitionerQuery/FhirPractitionerMutation,
+FhirPractitionerRoleQuery/FhirPractitionerRoleMutation,
+FhirScheduleQuery/FhirScheduleMutation, and
+FhirSlotQuery/FhirSlotMutation are.
 
 GraphQL is this service's only transport — there is no REST layer.
 """
@@ -36,20 +44,43 @@ from app.gql.location.queries import FhirLocationQuery
 from app.gql.logging import GqlLoggingExtension
 from app.gql.organization.mutations import FhirOrganizationMutation
 from app.gql.organization.queries import FhirOrganizationQuery
+from app.gql.practitioner.mutations import FhirPractitionerMutation
+from app.gql.practitioner.queries import FhirPractitionerQuery
+from app.gql.practitioner_role.mutations import FhirPractitionerRoleMutation
+from app.gql.practitioner_role.queries import FhirPractitionerRoleQuery
+from app.gql.schedule.mutations import FhirScheduleMutation
+from app.gql.schedule.queries import FhirScheduleQuery
+from app.gql.slot.mutations import FhirSlotMutation
+from app.gql.slot.queries import FhirSlotQuery
 from app.gql.test_subscription import TestSubscription
 
 
 @strawberry.type
-class Query(FhirOrganizationQuery, FhirLocationQuery, FhirHealthcareServiceQuery):
+class Query(
+    FhirOrganizationQuery,
+    FhirLocationQuery,
+    FhirHealthcareServiceQuery,
+    FhirPractitionerQuery,
+    FhirPractitionerRoleQuery,
+    FhirScheduleQuery,
+    FhirSlotQuery,
+):
     """Root GraphQL query type — merges every resource's query fields via
     mixin inheritance. Add a new resource's Query mixin here alongside
-    `FhirOrganizationQuery`/`FhirLocationQuery`/`FhirHealthcareServiceQuery`
-    as it's added."""
+    `FhirOrganizationQuery`/`FhirLocationQuery`/`FhirHealthcareServiceQuery`/
+    `FhirPractitionerQuery`/`FhirPractitionerRoleQuery`/`FhirScheduleQuery`/
+    `FhirSlotQuery` as it's added."""
 
 
 @strawberry.type
 class Mutation(
-    FhirOrganizationMutation, FhirLocationMutation, FhirHealthcareServiceMutation
+    FhirOrganizationMutation,
+    FhirLocationMutation,
+    FhirHealthcareServiceMutation,
+    FhirPractitionerMutation,
+    FhirPractitionerRoleMutation,
+    FhirScheduleMutation,
+    FhirSlotMutation,
 ):
     """Root GraphQL mutation type — merges every resource's mutation fields via mixin inheritance."""
 

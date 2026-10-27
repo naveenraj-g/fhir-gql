@@ -23,11 +23,19 @@ from app.connectors.internal.translators import (
     InternalHealthcareServiceTranslator,
     InternalLocationTranslator,
     InternalOrganizationTranslator,
+    InternalPractitionerTranslator,
+    InternalPractitionerRoleTranslator,
+    InternalScheduleTranslator,
+    InternalSlotTranslator,
 )
 from app.connectors.medplum.translators import (
     MedplumHealthcareServiceTranslator,
     MedplumLocationTranslator,
     MedplumOrganizationTranslator,
+    MedplumPractitionerTranslator,
+    MedplumPractitionerRoleTranslator,
+    MedplumScheduleTranslator,
+    MedplumSlotTranslator,
 )
 from app.core.config import settings
 
@@ -44,6 +52,26 @@ LOCATION_TRANSLATORS = {
 HEALTHCARE_SERVICE_TRANSLATORS = {
     "internal": InternalHealthcareServiceTranslator(),
     "medplum": MedplumHealthcareServiceTranslator(),
+}
+
+PRACTITIONER_TRANSLATORS = {
+    "internal": InternalPractitionerTranslator(),
+    "medplum": MedplumPractitionerTranslator(),
+}
+
+PRACTITIONER_ROLE_TRANSLATORS = {
+    "internal": InternalPractitionerRoleTranslator(),
+    "medplum": MedplumPractitionerRoleTranslator(),
+}
+
+SCHEDULE_TRANSLATORS = {
+    "internal": InternalScheduleTranslator(),
+    "medplum": MedplumScheduleTranslator(),
+}
+
+SLOT_TRANSLATORS = {
+    "internal": InternalSlotTranslator(),
+    "medplum": MedplumSlotTranslator(),
 }
 
 
@@ -66,3 +94,31 @@ def active_healthcare_service_translator():
     configs/config.yaml's `connectors.active` currently selects. Shared by
     both app.gql.healthcare_service.queries and .mutations."""
     return HEALTHCARE_SERVICE_TRANSLATORS[settings.connectors.active]
+
+
+def active_practitioner_translator():
+    """The Practitioner wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.practitioner.queries and .mutations."""
+    return PRACTITIONER_TRANSLATORS[settings.connectors.active]
+
+
+def active_practitioner_role_translator():
+    """The PractitionerRole wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.practitioner_role.queries and .mutations."""
+    return PRACTITIONER_ROLE_TRANSLATORS[settings.connectors.active]
+
+
+def active_schedule_translator():
+    """The Schedule wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.schedule.queries and .mutations."""
+    return SCHEDULE_TRANSLATORS[settings.connectors.active]
+
+
+def active_slot_translator():
+    """The Slot wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.slot.queries and .mutations."""
+    return SLOT_TRANSLATORS[settings.connectors.active]

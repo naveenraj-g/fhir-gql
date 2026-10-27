@@ -14,6 +14,7 @@ for the same model would conflict rather than add anything.
 """
 
 import strawberry
+from strawberry.scalars import JSON
 
 from app.fhir.schemas.healthcare_service import (
     FhirAttachment,
@@ -80,3 +81,7 @@ class FhirHealthcareServiceNotAvailableInput:
 )
 class FhirHealthcareServiceInput:
     """Input for createFhirHealthcareService/updateFhirHealthcareService."""
+
+    # dict isn't a native GraphQL scalar — must be overridden explicitly as
+    # the JSON scalar, same as Organization's own extension/assigner fields.
+    extension: JSON | None = None

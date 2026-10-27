@@ -17,9 +17,21 @@ from app.connectors.medplum.translators.location import MedplumLocationTranslato
 from app.connectors.medplum.translators.organization import (
     MedplumOrganizationTranslator,
 )
+from app.connectors.medplum.translators.practitioner import (
+    MedplumPractitionerTranslator,
+)
+from app.connectors.medplum.translators.practitioner_role import (
+    MedplumPractitionerRoleTranslator,
+)
+from app.connectors.medplum.translators.schedule import MedplumScheduleTranslator
+from app.connectors.medplum.translators.slot import MedplumSlotTranslator
 
 __all__ = [
     "MedplumHealthcareServiceTranslator",
     "MedplumLocationTranslator",
     "MedplumOrganizationTranslator",
+    "MedplumPractitionerTranslator",
+    "MedplumPractitionerRoleTranslator",
+    "MedplumScheduleTranslator",
+    "MedplumSlotTranslator",
 ]
