@@ -16,6 +16,9 @@ from app.connectors.medplum.translators.appointment import (
 from app.connectors.medplum.translators.appointment_response import (
     MedplumAppointmentResponseTranslator,
 )
+from app.connectors.medplum.translators.diagnostic_report import (
+    MedplumDiagnosticReportTranslator,
+)
 from app.connectors.medplum.translators.encounter import MedplumEncounterTranslator
 from app.connectors.medplum.translators.healthcare_service import (
     MedplumHealthcareServiceTranslator,
@@ -23,6 +26,9 @@ from app.connectors.medplum.translators.healthcare_service import (
 from app.connectors.medplum.translators.location import MedplumLocationTranslator
 from app.connectors.medplum.translators.medication_request import (
     MedplumMedicationRequestTranslator,
+)
+from app.connectors.medplum.translators.observation import (
+    MedplumObservationTranslator,
 )
 from app.connectors.medplum.translators.organization import (
     MedplumOrganizationTranslator,
@@ -46,10 +52,12 @@ from app.connectors.medplum.translators.slot import MedplumSlotTranslator
 __all__ = [
     "MedplumAppointmentTranslator",
     "MedplumAppointmentResponseTranslator",
+    "MedplumDiagnosticReportTranslator",
     "MedplumEncounterTranslator",
     "MedplumHealthcareServiceTranslator",
     "MedplumLocationTranslator",
     "MedplumMedicationRequestTranslator",
+    "MedplumObservationTranslator",
     "MedplumOrganizationTranslator",
     "MedplumPractitionerTranslator",
     "MedplumPractitionerRoleTranslator",

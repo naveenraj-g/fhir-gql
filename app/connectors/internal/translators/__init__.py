@@ -16,6 +16,9 @@ from app.connectors.internal.translators.appointment import (
 from app.connectors.internal.translators.appointment_response import (
     InternalAppointmentResponseTranslator,
 )
+from app.connectors.internal.translators.diagnostic_report import (
+    InternalDiagnosticReportTranslator,
+)
 from app.connectors.internal.translators.encounter import InternalEncounterTranslator
 from app.connectors.internal.translators.healthcare_service import (
     InternalHealthcareServiceTranslator,
@@ -23,6 +26,9 @@ from app.connectors.internal.translators.healthcare_service import (
 from app.connectors.internal.translators.location import InternalLocationTranslator
 from app.connectors.internal.translators.medication_request import (
     InternalMedicationRequestTranslator,
+)
+from app.connectors.internal.translators.observation import (
+    InternalObservationTranslator,
 )
 from app.connectors.internal.translators.organization import (
     InternalOrganizationTranslator,
@@ -46,10 +52,12 @@ from app.connectors.internal.translators.slot import InternalSlotTranslator
 __all__ = [
     "InternalAppointmentTranslator",
     "InternalAppointmentResponseTranslator",
+    "InternalDiagnosticReportTranslator",
     "InternalEncounterTranslator",
     "InternalHealthcareServiceTranslator",
     "InternalLocationTranslator",
     "InternalMedicationRequestTranslator",
+    "InternalObservationTranslator",
     "InternalOrganizationTranslator",
     "InternalPractitionerTranslator",
     "InternalPractitionerRoleTranslator",

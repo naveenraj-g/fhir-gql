@@ -57,6 +57,8 @@ from app.gql.appointment.queries import FhirAppointmentQuery
 from app.gql.appointment_response.mutations import FhirAppointmentResponseMutation
 from app.gql.appointment_response.queries import FhirAppointmentResponseQuery
 from app.gql.context import get_context
+from app.gql.diagnostic_report.mutations import FhirDiagnosticReportMutation
+from app.gql.diagnostic_report.queries import FhirDiagnosticReportQuery
 from app.gql.encounter.mutations import FhirEncounterMutation
 from app.gql.encounter.queries import FhirEncounterQuery
 from app.gql.healthcare_service.mutations import FhirHealthcareServiceMutation
@@ -66,6 +68,8 @@ from app.gql.location.queries import FhirLocationQuery
 from app.gql.logging import GqlLoggingExtension
 from app.gql.medication_request.mutations import FhirMedicationRequestMutation
 from app.gql.medication_request.queries import FhirMedicationRequestQuery
+from app.gql.observation.mutations import FhirObservationMutation
+from app.gql.observation.queries import FhirObservationQuery
 from app.gql.organization.mutations import FhirOrganizationMutation
 from app.gql.organization.queries import FhirOrganizationQuery
 from app.gql.practitioner.mutations import FhirPractitionerMutation
@@ -101,6 +105,8 @@ class Query(
     FhirQuestionnaireResponseQuery,
     FhirServiceRequestQuery,
     FhirMedicationRequestQuery,
+    FhirObservationQuery,
+    FhirDiagnosticReportQuery,
 ):
     """Root GraphQL query type — merges every resource's query fields via
     mixin inheritance. Add a new resource's Query mixin here alongside
@@ -108,7 +114,7 @@ class Query(
     `FhirPractitionerQuery`/`FhirPractitionerRoleQuery`/`FhirScheduleQuery`/
     `FhirSlotQuery`/`FhirAppointmentQuery`/`FhirAppointmentResponseQuery`/
     `FhirEncounterQuery`/`FhirQuestionnaireQuery`/`FhirQuestionnaireResponseQuery`/
-    `FhirServiceRequestQuery`/`FhirMedicationRequestQuery` as it's added."""
+    `FhirServiceRequestQuery`/`FhirMedicationRequestQuery`/`FhirObservationQuery` as it's added."""
 
 
 @strawberry.type
@@ -127,6 +133,8 @@ class Mutation(
     FhirQuestionnaireResponseMutation,
     FhirServiceRequestMutation,
     FhirMedicationRequestMutation,
+    FhirObservationMutation,
+    FhirDiagnosticReportMutation,
 ):
     """Root GraphQL mutation type — merges every resource's mutation fields via mixin inheritance."""
 
