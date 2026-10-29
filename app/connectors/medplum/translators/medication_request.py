@@ -7,11 +7,11 @@ for the overall idea — this mirrors it for MedicationRequest.
 Medplum is genuinely FHIR-native, so canonical path/params/body ARE its
 real path/params/body — a pure pass-through in every direction except
 `to_wire_patch` (RFC 6902 JSON Patch). `to_wire_create`/`to_wire_patch`
-accept the same extra keyword-only arguments as
-InternalMedicationRequestTranslator's own, purely so
-app.gql.medication_request.mutations can call either translator
-uniformly — Medplum itself never had an org_id/created_by/updated_by
-body-field requirement, so these are accepted and discarded.
+take the same plain `data`-only signature as every other resource's
+Medplum translator — MedicationRequest's auth rollout on the
+fhir-server side doesn't affect this connector at all, since Medplum
+never had an org_id/created_by/updated_by body-field requirement to
+begin with.
 """
 
 from app.connectors.medplum.json_patch import to_json_patch
@@ -34,14 +34,11 @@ class MedplumMedicationRequestTranslator:
         intent: str | None,
         subject: str | None,
         identifier: str | None,
-        tenant_id: str | None,
-        user_id: str | None,
         limit: int,
         offset: int,
     ) -> dict:
         """Medplum speaks genuine FHIR R4 search params natively —
-        https://hl7.org/fhir/R4/medicationrequest.html#search. `tenant_id`/
-        `user_id` have no FHIR-native equivalent and are never forwarded."""
+        https://hl7.org/fhir/R4/medicationrequest.html#search."""
         params: dict = {"_count": limit, "_offset": offset}
         if status is not None:
             params["status"] = status
@@ -56,8 +53,8 @@ class MedplumMedicationRequestTranslator:
     def from_wire(self, raw: dict) -> dict:
         return raw
 
-    def to_wire_create(self, data: dict, *, tenant_id: str, user_id: str | None, created_by: str) -> dict:
+    def to_wire_create(self, data: dict) -> dict:
         return {"resourceType": "MedicationRequest", **data}
 
-    def to_wire_patch(self, data: dict, *, updated_by: str | None) -> list[dict]:
+    def to_wire_patch(self, data: dict) -> list[dict]:
         return to_json_patch(data)

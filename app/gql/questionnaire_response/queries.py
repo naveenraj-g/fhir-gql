@@ -5,12 +5,6 @@ connector (internal, medplum, ...) is actually active. Mirrors
 app.gql.questionnaire.queries exactly — see that module and
 app.gql.organization's package docstring for the overall idea.
 
-QuestionnaireResponse is a default (gateway-trusted) resource on
-fhir-server (see app.connectors.internal.translators.questionnaire_response's
-module docstring) — this gateway's own `questionnaire_response:read`
-permission check still applies regardless; that's a GraphQL-boundary
-authorization concern, separate from whether fhir-server itself also
-re-checks the JWT.
 """
 
 from typing import Annotated
@@ -66,11 +60,9 @@ class FhirQuestionnaireResponseQuery:
             "subset of the FHIR R4 QuestionnaireResponse search parameters "
             "(https://hl7.org/fhir/R4/questionnaireresponse.html#search) — "
             "status, questionnaire, subject, identifier — plus limit/offset "
-            "pagination. QuestionnaireResponse is a default (gateway-trusted) "
-            "resource on fhir-server, so `tenantId`/`userId` are explicit, "
-            "client-suppliable filters here, unlike an auth-rollout resource's "
-            "org-derived scoping. Requires the `questionnaire_response:read` "
-            "permission."
+            "pagination. Always scoped to the caller's own org, derived from "
+            "the forwarded JWT — not a client-suppliable filter. Requires the "
+            "`questionnaire_response:read` permission."
         )
     )
     @translate_errors
@@ -92,14 +84,6 @@ class FhirQuestionnaireResponseQuery:
             str | None,
             strawberry.argument(description="Exact match on the business identifier value."),
         ] = None,
-        tenant_id: Annotated[
-            str | None,
-            strawberry.argument(description="Gateway-forwarded tenant/account ID filter."),
-        ] = None,
-        user_id: Annotated[
-            str | None,
-            strawberry.argument(description="Gateway-forwarded end-user ID filter."),
-        ] = None,
         limit: Annotated[
             int, strawberry.argument(description="Max results (default 50).")
         ] = 50,
@@ -112,7 +96,7 @@ class FhirQuestionnaireResponseQuery:
         connector = get_container(info).core.fhir_client()
         translator = active_questionnaire_response_translator()
         params = translator.list_params(
-            status, questionnaire, subject, identifier, tenant_id, user_id, limit, offset
+            status, questionnaire, subject, identifier, limit, offset
         )
         raw = await connector.get(
             translator.list_path(), params=params, accept=translator.accept, actor=actor

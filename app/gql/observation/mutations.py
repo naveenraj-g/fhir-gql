@@ -1,9 +1,13 @@
 """
-Mutation fields for the Observation resource. Mirrors
-app.gql.medication_request.mutations exactly — see that module's
-docstring for why `to_wire_create`/`to_wire_patch` take extra
-keyword-only arguments here (Observation is a default/gateway-trusted
-resource on fhir-server).
+Mutation fields for the Observation resource. fhir-server's own
+Observation is now one of its JWT-auth-rollout resources, so
+`org_id`/`created_by`/`updated_by` are derived by fhir-server itself
+from the forwarded JWT (via `actor`, passed straight to the connector),
+never built into the wire body here. `inject_audit=False` is still
+passed, same as every other rolled-out resource's mutations —
+InternalConnector's generic actor.sub-only mechanism would otherwise
+try to merge `created_by` into a body whose schema no longer accepts
+it.
 """
 
 from typing import Annotated
@@ -42,7 +46,7 @@ class FhirObservationMutation:
         data = input.to_pydantic().model_dump(exclude_none=True, mode="json")
         raw = await connector.post(
             translator.list_path(),
-            translator.to_wire_create(data, tenant_id=actor.org_id, user_id=actor.sub, created_by=actor.sub),
+            translator.to_wire_create(data),
             actor=actor,
             accept=translator.accept,
             inject_audit=False,
@@ -69,7 +73,7 @@ class FhirObservationMutation:
         data = input.to_pydantic().model_dump(exclude_none=True, mode="json")
         raw = await connector.patch(
             translator.item_path(id),
-            translator.to_wire_patch(data, updated_by=actor.sub),
+            translator.to_wire_patch(data),
             actor=actor,
             accept=translator.accept,
             inject_audit=False,

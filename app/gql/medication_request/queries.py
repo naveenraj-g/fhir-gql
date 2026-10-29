@@ -50,10 +50,9 @@ class FhirMedicationRequestQuery:
             "subset of the FHIR R4 MedicationRequest search parameters "
             "(https://hl7.org/fhir/R4/medicationrequest.html#search) — "
             "status, intent, subject, identifier — plus limit/offset "
-            "pagination. MedicationRequest is a default (gateway-trusted) "
-            "resource on fhir-server, so `tenantId`/`userId` are explicit, "
-            "client-suppliable filters here. Requires the "
-            "`medication_request:read` permission."
+            "pagination. Always scoped to the caller's own org, derived "
+            "from the forwarded JWT — not a client-suppliable filter. "
+            "Requires the `medication_request:read` permission."
         )
     )
     @translate_errors
@@ -74,12 +73,6 @@ class FhirMedicationRequestQuery:
         identifier: Annotated[
             str | None, strawberry.argument(description="Exact match on a business identifier value.")
         ] = None,
-        tenant_id: Annotated[
-            str | None, strawberry.argument(description="Gateway-forwarded tenant/account ID filter.")
-        ] = None,
-        user_id: Annotated[
-            str | None, strawberry.argument(description="Gateway-forwarded end-user ID filter.")
-        ] = None,
         limit: Annotated[int, strawberry.argument(description="Max results (default 50).")] = 50,
         offset: Annotated[int, strawberry.argument(description="Pagination offset (default 0).")] = 0,
     ) -> list[FhirMedicationRequestType]:
@@ -87,7 +80,7 @@ class FhirMedicationRequestQuery:
         actor = require_gql_permission(info, "medication_request", "read")
         connector = get_container(info).core.fhir_client()
         translator = active_medication_request_translator()
-        params = translator.list_params(status, intent, subject, identifier, tenant_id, user_id, limit, offset)
+        params = translator.list_params(status, intent, subject, identifier, limit, offset)
         raw = await connector.get(translator.list_path(), params=params, accept=translator.accept, actor=actor)
         resources = _entries_from_bundle(translator.from_wire(raw))
         return [

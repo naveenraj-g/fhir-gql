@@ -4,10 +4,13 @@ MedicationRequest shape used by app.gql.medication_request. See
 app.connectors.internal.translators.service_request's module docstring
 for the overall idea — this mirrors it for MedicationRequest.
 
-MedicationRequest is a default (gateway-trusted) resource on fhir-server
-— same as ServiceRequest — so `to_wire_create`/`to_wire_patch` take the
-same extra keyword-only `tenant_id`/`user_id`/`created_by`/`updated_by`
-arguments.
+**MedicationRequest is now one of fhir-server's auth-rollout
+resources**, same as ServiceRequest/Questionnaire/etc. — fhir-server
+derives `org_id`/`created_by`/`updated_by` from the forwarded JWT
+itself, so `to_wire_create`/`to_wire_patch` take no extra keyword-only
+arguments, same shape as every other resource's translator. `user_id`
+is still a plain fhir-server field, but has no canonical-FHIR source
+to translate from, so it's simply never populated here.
 """
 
 
@@ -186,8 +189,6 @@ class InternalMedicationRequestTranslator:
         intent: str | None,
         subject: str | None,
         identifier: str | None,
-        tenant_id: str | None,
-        user_id: str | None,
         limit: int,
         offset: int,
     ) -> dict:
@@ -200,25 +201,13 @@ class InternalMedicationRequestTranslator:
             params["subject"] = subject
         if identifier is not None:
             params["identifier"] = identifier
-        if tenant_id is not None:
-            params["tenant_id"] = tenant_id
-        if user_id is not None:
-            params["user_id"] = user_id
         return params
 
     def from_wire(self, raw: dict) -> dict:
         return raw
 
-    def to_wire_create(self, data: dict, *, tenant_id: str, user_id: str | None, created_by: str) -> dict:
-        body = _mr_body(data)
-        body["tenant_id"] = tenant_id
-        if user_id is not None:
-            body["user_id"] = user_id
-        body["created_by"] = created_by
-        return body
+    def to_wire_create(self, data: dict) -> dict:
+        return _mr_body(data)
 
-    def to_wire_patch(self, data: dict, *, updated_by: str | None) -> dict:
-        body = _mr_body(data)
-        if updated_by is not None:
-            body["updated_by"] = updated_by
-        return body
+    def to_wire_patch(self, data: dict) -> dict:
+        return _mr_body(data)

@@ -4,21 +4,13 @@ FHIR R4-shaped input/output regardless of which connector (internal,
 medplum, ...) is actually active; each connector's translator maps this
 shape onto its own write conventions.
 
-QuestionnaireResponse is a default (gateway-trusted) resource on
-fhir-server — unlike every other resource this gateway talks to, it was
-never asked to get the JWT-auth-rollout treatment (see
-app.connectors.internal.translators.questionnaire_response's module
-docstring), so fhir-server still expects `tenant_id`/`user_id`/
-`created_by`/`updated_by` as plain request-body fields rather than
-deriving them from a forwarded JWT itself. `inject_audit=False` is passed
-(same as every other resource's mutations) because InternalConnector's own
-generic actor.sub-only mechanism only ever injects `created_by`/
-`updated_by`, never `tenant_id`/`user_id` — this module builds the wire
-body with all four explicitly instead, via `to_wire_create`/
-`to_wire_patch`'s extra keyword-only arguments (both connectors' own
-translators accept the same extra arguments — Medplum's just discards
-them, see its own module docstring — so this call site never needs to
-branch on which connector is active).
+fhir-server's own QuestionnaireResponse is now one of its JWT-auth-rollout
+resources, so `org_id`/`created_by`/`updated_by` are derived by
+fhir-server itself from the forwarded JWT (via `actor`, passed straight
+to the connector), never built into the wire body here. `inject_audit=False`
+is still passed, same as every other rolled-out resource's mutations —
+InternalConnector's generic actor.sub-only mechanism would otherwise try
+to merge `created_by` into a body whose schema no longer accepts it.
 """
 
 from typing import Annotated
@@ -62,9 +54,7 @@ class FhirQuestionnaireResponseMutation:
         data = input.to_pydantic().model_dump(exclude_none=True, mode="json")
         raw = await connector.post(
             translator.list_path(),
-            translator.to_wire_create(
-                data, tenant_id=actor.org_id, user_id=actor.sub, created_by=actor.sub
-            ),
+            translator.to_wire_create(data),
             actor=actor,
             accept=translator.accept,
             inject_audit=False,
@@ -97,7 +87,7 @@ class FhirQuestionnaireResponseMutation:
         data = input.to_pydantic().model_dump(exclude_none=True, mode="json")
         raw = await connector.patch(
             translator.item_path(id),
-            translator.to_wire_patch(data, updated_by=actor.sub),
+            translator.to_wire_patch(data),
             actor=actor,
             accept=translator.accept,
             inject_audit=False,

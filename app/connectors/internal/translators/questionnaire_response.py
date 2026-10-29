@@ -12,24 +12,20 @@ query-param names (`limit`/`offset`, not FHIR search's `_count`/
 `_offset`), and — on write only — its own flattened plain-JSON
 create/patch body shape (see `_qr_body` below).
 
-**QuestionnaireResponse is a default (gateway-trusted) resource on
-fhir-server** — unlike every OTHER resource this gateway talks to, it was
-never asked to get the JWT-auth-rollout treatment (see fhir-server's
-CLAUDE.md "Multi-Tenancy & Ownership" section and
-`/resource-auth-rollout`), so `tenant_id`/`user_id`/`created_by`/
-`updated_by` are still plain, gateway-forwarded body fields there — the
-exact shape Questionnaire's OWN translator used to have before its own
-rollout (see git history / fhir-server's CLAUDE.md "Adding a New FHIR
-Resource" section, which still documents that conversion as the worked
-example). `to_wire_create`/`to_wire_patch` therefore take EXTRA
-keyword-only arguments, unlike every other resource's translator in this
-gateway — `app.gql.questionnaire_response.mutations` calls
-`connector.post`/`.patch` with `inject_audit=False` (InternalConnector's
-own generic actor.sub-only mechanism only ever injects `created_by`/
-`updated_by`, never `tenant_id`/`user_id` — see
-app.connectors.internal.client's docstring) and passes `tenant_id`/
-`user_id`/`created_by`/`updated_by` through to this translator explicitly
-instead.
+**QuestionnaireResponse is now one of fhir-server's auth-rollout
+resources**, same as Questionnaire/Organization/etc. — fhir-server
+derives `org_id`/`created_by`/`updated_by` from the forwarded JWT
+itself, so `to_wire_create`/`to_wire_patch` take no extra keyword-only
+arguments, same shape as every other resource's translator.
+`app.gql.questionnaire_response.mutations` calls `connector.post`/
+`.patch` with `inject_audit=False` the same way every other rolled-out
+resource does — `actor` alone is forwarded (via the Authorization
+header InternalConnector always sets), and fhir-server decodes
+org_id/sub from it itself.
+
+`user_id` is still a plain fhir-server field, but has no canonical-FHIR
+source to translate from, so it's simply never populated here — same
+narrower gap as every other resource's translator.
 """
 
 
@@ -175,8 +171,6 @@ class InternalQuestionnaireResponseTranslator:
         questionnaire: str | None,
         subject: str | None,
         identifier: str | None,
-        tenant_id: str | None,
-        user_id: str | None,
         limit: int,
         offset: int,
     ) -> dict:
@@ -189,32 +183,13 @@ class InternalQuestionnaireResponseTranslator:
             params["subject"] = subject
         if identifier is not None:
             params["identifier"] = identifier
-        if tenant_id is not None:
-            params["tenant_id"] = tenant_id
-        if user_id is not None:
-            params["user_id"] = user_id
         return params
 
     def from_wire(self, raw: dict) -> dict:
         return raw
 
-    def to_wire_create(
-        self,
-        data: dict,
-        *,
-        tenant_id: str,
-        user_id: str | None,
-        created_by: str,
-    ) -> dict:
-        body = _qr_body(data)
-        body["tenant_id"] = tenant_id
-        if user_id is not None:
-            body["user_id"] = user_id
-        body["created_by"] = created_by
-        return body
+    def to_wire_create(self, data: dict) -> dict:
+        return _qr_body(data)
 
-    def to_wire_patch(self, data: dict, *, updated_by: str | None) -> dict:
-        body = _qr_body(data)
-        if updated_by is not None:
-            body["updated_by"] = updated_by
-        return body
+    def to_wire_patch(self, data: dict) -> dict:
+        return _qr_body(data)
