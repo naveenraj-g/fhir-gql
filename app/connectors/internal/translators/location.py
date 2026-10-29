@@ -192,7 +192,7 @@ def _location_body(data: dict) -> dict:
         "availability_exceptions": data.get("availabilityExceptions"),
         "identifier": [_identifier(i) for i in (data.get("identifier") or [])] or None,
         "type": [_location_type(t) for t in (data.get("type") or [])] or None,
-        "alias": [{"value": a} for a in (data.get("alias") or [])] or None,
+        "alias": list(data.get("alias") or []) or None,
         "telecom": [_telecom(t) for t in (data.get("telecom") or [])] or None,
         "hours_of_operation": [
             _hours_of_operation(h) for h in (data.get("hoursOfOperation") or [])
