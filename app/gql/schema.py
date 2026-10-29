@@ -3,18 +3,29 @@ Composes the GraphQL schema from per-domain Query/Mutation resolver mixins
 and exposes it as a FastAPI-mountable router.
 
 Organization, Location, HealthcareService, Practitioner,
-PractitionerRole, Schedule, and Slot are the FHIR resources this gateway
-exposes. All seven are genuinely FHIR R4-shaped end-to-end (see
-app.gql.organization's package docstring, which app.gql.location,
-app.gql.healthcare_service, app.gql.practitioner, app.gql.practitioner_role,
-app.gql.schedule, and app.gql.slot all mirror exactly) — their resolvers
-call the active connector directly and translate via
+PractitionerRole, Schedule, Slot, Appointment, AppointmentResponse,
+Encounter, Questionnaire, and QuestionnaireResponse are the FHIR
+resources this gateway exposes. All twelve are genuinely FHIR R4-shaped
+end-to-end (see app.gql.organization's package docstring, which
+app.gql.location, app.gql.healthcare_service, app.gql.practitioner,
+app.gql.practitioner_role, app.gql.schedule, app.gql.slot,
+app.gql.appointment, app.gql.appointment_response, app.gql.encounter,
+app.gql.questionnaire, and app.gql.questionnaire_response all mirror
+exactly) — their resolvers call the active connector directly and
+translate via
 app.connectors.translator_registry.active_organization_translator()/
 active_location_translator()/active_healthcare_service_translator()/
 active_practitioner_translator()/active_practitioner_role_translator()/
-active_schedule_translator()/active_slot_translator(), keyed off
+active_schedule_translator()/active_slot_translator()/
+active_appointment_translator()/active_appointment_response_translator()/
+active_encounter_translator()/active_questionnaire_translator()/
+active_questionnaire_response_translator(), keyed off
 `settings.connectors.active`, rather than going through a per-resource
-service/client layer.
+service/client layer. QuestionnaireResponse is the one exception to the
+"genuinely FHIR R4-shaped, no extra fields" rule on write — see
+app.connectors.internal.translators.questionnaire_response's module
+docstring for why its own `to_wire_create`/`to_wire_patch` take extra
+keyword-only arguments unlike every other resource's translator.
 
 Adding another resource means: write its `app/gql/<resource>/types/` +
 `queries.py` + `mutations.py` (and, if it needs its own translation layer,
@@ -26,8 +37,13 @@ FhirLocationQuery/FhirLocationMutation,
 FhirHealthcareServiceQuery/FhirHealthcareServiceMutation,
 FhirPractitionerQuery/FhirPractitionerMutation,
 FhirPractitionerRoleQuery/FhirPractitionerRoleMutation,
-FhirScheduleQuery/FhirScheduleMutation, and
-FhirSlotQuery/FhirSlotMutation are.
+FhirScheduleQuery/FhirScheduleMutation,
+FhirSlotQuery/FhirSlotMutation,
+FhirAppointmentQuery/FhirAppointmentMutation,
+FhirAppointmentResponseQuery/FhirAppointmentResponseMutation,
+FhirEncounterQuery/FhirEncounterMutation,
+FhirQuestionnaireQuery/FhirQuestionnaireMutation, and
+FhirQuestionnaireResponseQuery/FhirQuestionnaireResponseMutation are.
 
 GraphQL is this service's only transport — there is no REST layer.
 """
@@ -36,20 +52,34 @@ import strawberry
 from strawberry.fastapi import GraphQLRouter
 
 from app.core.config import settings
+from app.gql.appointment.mutations import FhirAppointmentMutation
+from app.gql.appointment.queries import FhirAppointmentQuery
+from app.gql.appointment_response.mutations import FhirAppointmentResponseMutation
+from app.gql.appointment_response.queries import FhirAppointmentResponseQuery
 from app.gql.context import get_context
+from app.gql.encounter.mutations import FhirEncounterMutation
+from app.gql.encounter.queries import FhirEncounterQuery
 from app.gql.healthcare_service.mutations import FhirHealthcareServiceMutation
 from app.gql.healthcare_service.queries import FhirHealthcareServiceQuery
 from app.gql.location.mutations import FhirLocationMutation
 from app.gql.location.queries import FhirLocationQuery
 from app.gql.logging import GqlLoggingExtension
+from app.gql.medication_request.mutations import FhirMedicationRequestMutation
+from app.gql.medication_request.queries import FhirMedicationRequestQuery
 from app.gql.organization.mutations import FhirOrganizationMutation
 from app.gql.organization.queries import FhirOrganizationQuery
 from app.gql.practitioner.mutations import FhirPractitionerMutation
 from app.gql.practitioner.queries import FhirPractitionerQuery
 from app.gql.practitioner_role.mutations import FhirPractitionerRoleMutation
 from app.gql.practitioner_role.queries import FhirPractitionerRoleQuery
+from app.gql.questionnaire.mutations import FhirQuestionnaireMutation
+from app.gql.questionnaire.queries import FhirQuestionnaireQuery
+from app.gql.questionnaire_response.mutations import FhirQuestionnaireResponseMutation
+from app.gql.questionnaire_response.queries import FhirQuestionnaireResponseQuery
 from app.gql.schedule.mutations import FhirScheduleMutation
 from app.gql.schedule.queries import FhirScheduleQuery
+from app.gql.service_request.mutations import FhirServiceRequestMutation
+from app.gql.service_request.queries import FhirServiceRequestQuery
 from app.gql.slot.mutations import FhirSlotMutation
 from app.gql.slot.queries import FhirSlotQuery
 from app.gql.test_subscription import TestSubscription
@@ -64,12 +94,21 @@ class Query(
     FhirPractitionerRoleQuery,
     FhirScheduleQuery,
     FhirSlotQuery,
+    FhirAppointmentQuery,
+    FhirAppointmentResponseQuery,
+    FhirEncounterQuery,
+    FhirQuestionnaireQuery,
+    FhirQuestionnaireResponseQuery,
+    FhirServiceRequestQuery,
+    FhirMedicationRequestQuery,
 ):
     """Root GraphQL query type — merges every resource's query fields via
     mixin inheritance. Add a new resource's Query mixin here alongside
     `FhirOrganizationQuery`/`FhirLocationQuery`/`FhirHealthcareServiceQuery`/
     `FhirPractitionerQuery`/`FhirPractitionerRoleQuery`/`FhirScheduleQuery`/
-    `FhirSlotQuery` as it's added."""
+    `FhirSlotQuery`/`FhirAppointmentQuery`/`FhirAppointmentResponseQuery`/
+    `FhirEncounterQuery`/`FhirQuestionnaireQuery`/`FhirQuestionnaireResponseQuery`/
+    `FhirServiceRequestQuery`/`FhirMedicationRequestQuery` as it's added."""
 
 
 @strawberry.type
@@ -81,6 +120,13 @@ class Mutation(
     FhirPractitionerRoleMutation,
     FhirScheduleMutation,
     FhirSlotMutation,
+    FhirAppointmentMutation,
+    FhirAppointmentResponseMutation,
+    FhirEncounterMutation,
+    FhirQuestionnaireMutation,
+    FhirQuestionnaireResponseMutation,
+    FhirServiceRequestMutation,
+    FhirMedicationRequestMutation,
 ):
     """Root GraphQL mutation type — merges every resource's mutation fields via mixin inheritance."""
 

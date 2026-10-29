@@ -10,10 +10,20 @@ here so existing imports
 keep working unchanged regardless of which resource module a name lives in.
 """
 
+from app.connectors.medplum.translators.appointment import (
+    MedplumAppointmentTranslator,
+)
+from app.connectors.medplum.translators.appointment_response import (
+    MedplumAppointmentResponseTranslator,
+)
+from app.connectors.medplum.translators.encounter import MedplumEncounterTranslator
 from app.connectors.medplum.translators.healthcare_service import (
     MedplumHealthcareServiceTranslator,
 )
 from app.connectors.medplum.translators.location import MedplumLocationTranslator
+from app.connectors.medplum.translators.medication_request import (
+    MedplumMedicationRequestTranslator,
+)
 from app.connectors.medplum.translators.organization import (
     MedplumOrganizationTranslator,
 )
@@ -23,15 +33,29 @@ from app.connectors.medplum.translators.practitioner import (
 from app.connectors.medplum.translators.practitioner_role import (
     MedplumPractitionerRoleTranslator,
 )
+from app.connectors.medplum.translators.questionnaire import (
+    MedplumQuestionnaireTranslator,
+)
+from app.connectors.medplum.translators.questionnaire_response import (
+    MedplumQuestionnaireResponseTranslator,
+)
 from app.connectors.medplum.translators.schedule import MedplumScheduleTranslator
+from app.connectors.medplum.translators.service_request import MedplumServiceRequestTranslator
 from app.connectors.medplum.translators.slot import MedplumSlotTranslator
 
 __all__ = [
+    "MedplumAppointmentTranslator",
+    "MedplumAppointmentResponseTranslator",
+    "MedplumEncounterTranslator",
     "MedplumHealthcareServiceTranslator",
     "MedplumLocationTranslator",
+    "MedplumMedicationRequestTranslator",
     "MedplumOrganizationTranslator",
     "MedplumPractitionerTranslator",
     "MedplumPractitionerRoleTranslator",
+    "MedplumQuestionnaireTranslator",
+    "MedplumQuestionnaireResponseTranslator",
     "MedplumScheduleTranslator",
+    "MedplumServiceRequestTranslator",
     "MedplumSlotTranslator",
 ]

@@ -10,10 +10,20 @@ here so existing imports
 keep working unchanged regardless of which resource module a name lives in.
 """
 
+from app.connectors.internal.translators.appointment import (
+    InternalAppointmentTranslator,
+)
+from app.connectors.internal.translators.appointment_response import (
+    InternalAppointmentResponseTranslator,
+)
+from app.connectors.internal.translators.encounter import InternalEncounterTranslator
 from app.connectors.internal.translators.healthcare_service import (
     InternalHealthcareServiceTranslator,
 )
 from app.connectors.internal.translators.location import InternalLocationTranslator
+from app.connectors.internal.translators.medication_request import (
+    InternalMedicationRequestTranslator,
+)
 from app.connectors.internal.translators.organization import (
     InternalOrganizationTranslator,
 )
@@ -23,15 +33,29 @@ from app.connectors.internal.translators.practitioner import (
 from app.connectors.internal.translators.practitioner_role import (
     InternalPractitionerRoleTranslator,
 )
+from app.connectors.internal.translators.questionnaire import (
+    InternalQuestionnaireTranslator,
+)
+from app.connectors.internal.translators.questionnaire_response import (
+    InternalQuestionnaireResponseTranslator,
+)
 from app.connectors.internal.translators.schedule import InternalScheduleTranslator
+from app.connectors.internal.translators.service_request import InternalServiceRequestTranslator
 from app.connectors.internal.translators.slot import InternalSlotTranslator
 
 __all__ = [
+    "InternalAppointmentTranslator",
+    "InternalAppointmentResponseTranslator",
+    "InternalEncounterTranslator",
     "InternalHealthcareServiceTranslator",
     "InternalLocationTranslator",
+    "InternalMedicationRequestTranslator",
     "InternalOrganizationTranslator",
     "InternalPractitionerTranslator",
     "InternalPractitionerRoleTranslator",
+    "InternalQuestionnaireTranslator",
+    "InternalQuestionnaireResponseTranslator",
     "InternalScheduleTranslator",
+    "InternalServiceRequestTranslator",
     "InternalSlotTranslator",
 ]

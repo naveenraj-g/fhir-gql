@@ -20,24 +20,53 @@ resource_registry.py does.
 """
 
 from app.connectors.internal.translators import (
+    InternalAppointmentResponseTranslator,
+    InternalAppointmentTranslator,
+    InternalEncounterTranslator,
     InternalHealthcareServiceTranslator,
     InternalLocationTranslator,
+    InternalMedicationRequestTranslator,
     InternalOrganizationTranslator,
     InternalPractitionerTranslator,
     InternalPractitionerRoleTranslator,
+    InternalQuestionnaireTranslator,
+    InternalQuestionnaireResponseTranslator,
     InternalScheduleTranslator,
+    InternalServiceRequestTranslator,
     InternalSlotTranslator,
 )
 from app.connectors.medplum.translators import (
+    MedplumAppointmentResponseTranslator,
+    MedplumAppointmentTranslator,
+    MedplumEncounterTranslator,
     MedplumHealthcareServiceTranslator,
     MedplumLocationTranslator,
+    MedplumMedicationRequestTranslator,
     MedplumOrganizationTranslator,
     MedplumPractitionerTranslator,
     MedplumPractitionerRoleTranslator,
+    MedplumQuestionnaireTranslator,
+    MedplumQuestionnaireResponseTranslator,
     MedplumScheduleTranslator,
+    MedplumServiceRequestTranslator,
     MedplumSlotTranslator,
 )
 from app.core.config import settings
+
+APPOINTMENT_TRANSLATORS = {
+    "internal": InternalAppointmentTranslator(),
+    "medplum": MedplumAppointmentTranslator(),
+}
+
+APPOINTMENT_RESPONSE_TRANSLATORS = {
+    "internal": InternalAppointmentResponseTranslator(),
+    "medplum": MedplumAppointmentResponseTranslator(),
+}
+
+ENCOUNTER_TRANSLATORS = {
+    "internal": InternalEncounterTranslator(),
+    "medplum": MedplumEncounterTranslator(),
+}
 
 ORGANIZATION_TRANSLATORS = {
     "internal": InternalOrganizationTranslator(),
@@ -73,6 +102,47 @@ SLOT_TRANSLATORS = {
     "internal": InternalSlotTranslator(),
     "medplum": MedplumSlotTranslator(),
 }
+
+QUESTIONNAIRE_TRANSLATORS = {
+    "internal": InternalQuestionnaireTranslator(),
+    "medplum": MedplumQuestionnaireTranslator(),
+}
+
+QUESTIONNAIRE_RESPONSE_TRANSLATORS = {
+    "internal": InternalQuestionnaireResponseTranslator(),
+    "medplum": MedplumQuestionnaireResponseTranslator(),
+}
+
+SERVICE_REQUEST_TRANSLATORS = {
+    "internal": InternalServiceRequestTranslator(),
+    "medplum": MedplumServiceRequestTranslator(),
+}
+
+MEDICATION_REQUEST_TRANSLATORS = {
+    "internal": InternalMedicationRequestTranslator(),
+    "medplum": MedplumMedicationRequestTranslator(),
+}
+
+
+def active_appointment_translator():
+    """The Appointment wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.appointment.queries and .mutations."""
+    return APPOINTMENT_TRANSLATORS[settings.connectors.active]
+
+
+def active_appointment_response_translator():
+    """The AppointmentResponse wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.appointment_response.queries and .mutations."""
+    return APPOINTMENT_RESPONSE_TRANSLATORS[settings.connectors.active]
+
+
+def active_encounter_translator():
+    """The Encounter wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.encounter.queries and .mutations."""
+    return ENCOUNTER_TRANSLATORS[settings.connectors.active]
 
 
 def active_organization_translator():
@@ -122,3 +192,31 @@ def active_slot_translator():
     configs/config.yaml's `connectors.active` currently selects. Shared by
     both app.gql.slot.queries and .mutations."""
     return SLOT_TRANSLATORS[settings.connectors.active]
+
+
+def active_questionnaire_translator():
+    """The Questionnaire wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.questionnaire.queries and .mutations."""
+    return QUESTIONNAIRE_TRANSLATORS[settings.connectors.active]
+
+
+def active_questionnaire_response_translator():
+    """The QuestionnaireResponse wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.questionnaire_response.queries and .mutations."""
+    return QUESTIONNAIRE_RESPONSE_TRANSLATORS[settings.connectors.active]
+
+
+def active_service_request_translator():
+    """The ServiceRequest wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.service_request.queries and .mutations."""
+    return SERVICE_REQUEST_TRANSLATORS[settings.connectors.active]
+
+
+def active_medication_request_translator():
+    """The MedicationRequest wire translator for whichever connector
+    configs/config.yaml's `connectors.active` currently selects. Shared by
+    both app.gql.medication_request.queries and .mutations."""
+    return MEDICATION_REQUEST_TRANSLATORS[settings.connectors.active]
