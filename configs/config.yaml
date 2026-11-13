@@ -4,10 +4,6 @@
 # in configs/connectors/internal.yaml instead, alongside connectors.active
 # below. Precedence, highest first: real env var > .env > this file >
 # field defaults — see app/core/config.py's Settings.settings_customise_sources().
-#
-# Deliberately NOT here: a routes-style config for enabling/disabling
-# individual GraphQL queries or mutations. This gateway's schema is fixed at
-# import time (app/gql/schema.py) — there's no per-field toggle mechanism.
 
 app:
   title: "Middleware API — Patient"
@@ -72,3 +68,25 @@ logging:
     - token
     - password
     - secret
+
+routes:
+  # Resources whose GraphQL queries/mutations are composed into the schema at
+  # startup (app/gql/schema.py). Not listed = not in the schema. Names are the
+  # keys of RESOURCES in app/gql/schema.py. Restart required.
+  enabled:
+    - organization
+    - location
+    # - healthcare_service
+    # - practitioner
+    # - practitioner_role
+    # - schedule
+    # - slot
+    # - appointment
+    # - appointment_response
+    # - encounter
+    # - questionnaire
+    # - questionnaire_response
+    # - service_request
+    # - medication_request
+    # - observation
+    # - diagnostic_report

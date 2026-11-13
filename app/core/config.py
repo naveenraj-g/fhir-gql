@@ -21,11 +21,9 @@ mirrors fhir-server's own app/core/config.py precedence and split:
      IAM_JWKS_URL already is.
   4. Field defaults (lowest precedence) — defined on the models below.
 
-Deliberately NOT brought over from fhir-server: a `routes:`-style config for
-toggling individual GraphQL queries/mutations on or off. This gateway's
-schema is fixed at import time (app/gql/schema.py composes every resource's
-Query/Mutation unconditionally) — there is no per-field enable/disable
-mechanism here, and none was asked for.
+`routes.enabled` (configs/config.yaml) mirrors fhir-server's list of the same
+name: app/gql/schema.py composes the root Query/Mutation only from the
+resources named there. Not listed = its queries/mutations are not in the schema.
 """
 
 from typing import Literal
@@ -209,6 +207,14 @@ class LogConfig(BaseModel):
         return v
 
 
+class RoutesConfig(BaseModel):
+    """Which resources' GraphQL queries/mutations are exposed — resource names
+    are the keys of app.gql.schema.RESOURCES (e.g. "organization",
+    "practitioner_role"). Unknown names fail at startup."""
+
+    enabled: list[str] = Field(default_factory=list)
+
+
 class Settings(BaseSettings):
     """
     Application-wide settings. Pydantic-settings resolves each field from
@@ -242,6 +248,7 @@ class Settings(BaseSettings):
     redis: RedisConfig = Field(default_factory=RedisConfig)
     rate_limit: RateLimitConfig = Field(default_factory=RateLimitConfig)
     logging: LogConfig = Field(default_factory=LogConfig)
+    routes: RoutesConfig = Field(default_factory=RoutesConfig)
 
     model_config = SettingsConfigDict(
         env_file=".env",

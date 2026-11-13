@@ -27,116 +27,95 @@ app.connectors.internal.translators.questionnaire_response's module
 docstring for why its own `to_wire_create`/`to_wire_patch` take extra
 keyword-only arguments unlike every other resource's translator.
 
-Adding another resource means: write its `app/gql/<resource>/types/` +
-`queries.py` + `mutations.py` (and, if it needs its own translation layer,
-`app/connectors/<connector>/translators/<resource>.py` + a registry entry
-in app.connectors.translator_registry — see app.gql.organization's package
-docstring for the full pattern), then mix its Query/Mutation into the root
-types below the same way FhirOrganizationQuery/FhirOrganizationMutation,
-FhirLocationQuery/FhirLocationMutation,
-FhirHealthcareServiceQuery/FhirHealthcareServiceMutation,
-FhirPractitionerQuery/FhirPractitionerMutation,
-FhirPractitionerRoleQuery/FhirPractitionerRoleMutation,
-FhirScheduleQuery/FhirScheduleMutation,
-FhirSlotQuery/FhirSlotMutation,
-FhirAppointmentQuery/FhirAppointmentMutation,
-FhirAppointmentResponseQuery/FhirAppointmentResponseMutation,
-FhirEncounterQuery/FhirEncounterMutation,
-FhirQuestionnaireQuery/FhirQuestionnaireMutation, and
-FhirQuestionnaireResponseQuery/FhirQuestionnaireResponseMutation are.
+Which resources are exposed is driven by configs/config.yaml's
+`routes.enabled` (mirrors fhir-server). Adding another resource means: write
+its `app/gql/<resource>/` package (+ translators, see app.gql.organization's
+docstring), add an entry to RESOURCES below, and list its name in
+`routes.enabled`.
 
 GraphQL is this service's only transport — there is no REST layer.
 """
+
+import importlib
 
 import strawberry
 from strawberry.fastapi import GraphQLRouter
 
 from app.core.config import settings
-from app.gql.appointment.mutations import FhirAppointmentMutation
-from app.gql.appointment.queries import FhirAppointmentQuery
-from app.gql.appointment_response.mutations import FhirAppointmentResponseMutation
-from app.gql.appointment_response.queries import FhirAppointmentResponseQuery
 from app.gql.context import get_context
-from app.gql.diagnostic_report.mutations import FhirDiagnosticReportMutation
-from app.gql.diagnostic_report.queries import FhirDiagnosticReportQuery
-from app.gql.encounter.mutations import FhirEncounterMutation
-from app.gql.encounter.queries import FhirEncounterQuery
-from app.gql.healthcare_service.mutations import FhirHealthcareServiceMutation
-from app.gql.healthcare_service.queries import FhirHealthcareServiceQuery
-from app.gql.location.mutations import FhirLocationMutation
-from app.gql.location.queries import FhirLocationQuery
 from app.gql.logging import GqlLoggingExtension
-from app.gql.medication_request.mutations import FhirMedicationRequestMutation
-from app.gql.medication_request.queries import FhirMedicationRequestQuery
-from app.gql.observation.mutations import FhirObservationMutation
-from app.gql.observation.queries import FhirObservationQuery
-from app.gql.organization.mutations import FhirOrganizationMutation
-from app.gql.organization.queries import FhirOrganizationQuery
-from app.gql.practitioner.mutations import FhirPractitionerMutation
-from app.gql.practitioner.queries import FhirPractitionerQuery
-from app.gql.practitioner_role.mutations import FhirPractitionerRoleMutation
-from app.gql.practitioner_role.queries import FhirPractitionerRoleQuery
-from app.gql.questionnaire.mutations import FhirQuestionnaireMutation
-from app.gql.questionnaire.queries import FhirQuestionnaireQuery
-from app.gql.questionnaire_response.mutations import FhirQuestionnaireResponseMutation
-from app.gql.questionnaire_response.queries import FhirQuestionnaireResponseQuery
-from app.gql.schedule.mutations import FhirScheduleMutation
-from app.gql.schedule.queries import FhirScheduleQuery
-from app.gql.service_request.mutations import FhirServiceRequestMutation
-from app.gql.service_request.queries import FhirServiceRequestQuery
-from app.gql.slot.mutations import FhirSlotMutation
-from app.gql.slot.queries import FhirSlotQuery
-from app.gql.test_subscription import TestSubscription
+from app.gql.test_subscription import TestQuery, TestSubscription
+
+# resource name (as written in configs/config.yaml's routes.enabled) ->
+# (package, Query mixin, Mutation mixin). Modules are imported lazily, only
+# for enabled resources. Add a new resource here once its package exists.
+RESOURCES: dict[str, tuple[str, str, str]] = {
+    "organization": ("organization", "FhirOrganizationQuery", "FhirOrganizationMutation"),
+    "location": ("location", "FhirLocationQuery", "FhirLocationMutation"),
+    "healthcare_service": ("healthcare_service", "FhirHealthcareServiceQuery", "FhirHealthcareServiceMutation"),
+    "practitioner": ("practitioner", "FhirPractitionerQuery", "FhirPractitionerMutation"),
+    "practitioner_role": ("practitioner_role", "FhirPractitionerRoleQuery", "FhirPractitionerRoleMutation"),
+    "schedule": ("schedule", "FhirScheduleQuery", "FhirScheduleMutation"),
+    "slot": ("slot", "FhirSlotQuery", "FhirSlotMutation"),
+    "appointment": ("appointment", "FhirAppointmentQuery", "FhirAppointmentMutation"),
+    "appointment_response": ("appointment_response", "FhirAppointmentResponseQuery", "FhirAppointmentResponseMutation"),
+    "encounter": ("encounter", "FhirEncounterQuery", "FhirEncounterMutation"),
+    "questionnaire": ("questionnaire", "FhirQuestionnaireQuery", "FhirQuestionnaireMutation"),
+    "questionnaire_response": ("questionnaire_response", "FhirQuestionnaireResponseQuery", "FhirQuestionnaireResponseMutation"),
+    "service_request": ("service_request", "FhirServiceRequestQuery", "FhirServiceRequestMutation"),
+    "medication_request": ("medication_request", "FhirMedicationRequestQuery", "FhirMedicationRequestMutation"),
+    "observation": ("observation", "FhirObservationQuery", "FhirObservationMutation"),
+    "diagnostic_report": ("diagnostic_report", "FhirDiagnosticReportQuery", "FhirDiagnosticReportMutation"),
+}
 
 
-@strawberry.type
-class Query(
-    FhirOrganizationQuery,
-    FhirLocationQuery,
-    FhirHealthcareServiceQuery,
-    FhirPractitionerQuery,
-    FhirPractitionerRoleQuery,
-    FhirScheduleQuery,
-    FhirSlotQuery,
-    FhirAppointmentQuery,
-    FhirAppointmentResponseQuery,
-    FhirEncounterQuery,
-    FhirQuestionnaireQuery,
-    FhirQuestionnaireResponseQuery,
-    FhirServiceRequestQuery,
-    FhirMedicationRequestQuery,
-    FhirObservationQuery,
-    FhirDiagnosticReportQuery,
-):
-    """Root GraphQL query type — merges every resource's query fields via
-    mixin inheritance. Add a new resource's Query mixin here alongside
-    `FhirOrganizationQuery`/`FhirLocationQuery`/`FhirHealthcareServiceQuery`/
-    `FhirPractitionerQuery`/`FhirPractitionerRoleQuery`/`FhirScheduleQuery`/
-    `FhirSlotQuery`/`FhirAppointmentQuery`/`FhirAppointmentResponseQuery`/
-    `FhirEncounterQuery`/`FhirQuestionnaireQuery`/`FhirQuestionnaireResponseQuery`/
-    `FhirServiceRequestQuery`/`FhirMedicationRequestQuery`/`FhirObservationQuery` as it's added."""
+def _enabled_resources() -> list[str]:
+    enabled = list(dict.fromkeys(settings.routes.enabled))
+    unknown = [name for name in enabled if name not in RESOURCES]
+    if unknown:
+        raise RuntimeError(
+            f"routes.enabled contains unknown resource(s) {unknown}; "
+            f"valid names: {sorted(RESOURCES)}"
+        )
+    return enabled
 
 
-@strawberry.type
-class Mutation(
-    FhirOrganizationMutation,
-    FhirLocationMutation,
-    FhirHealthcareServiceMutation,
-    FhirPractitionerMutation,
-    FhirPractitionerRoleMutation,
-    FhirScheduleMutation,
-    FhirSlotMutation,
-    FhirAppointmentMutation,
-    FhirAppointmentResponseMutation,
-    FhirEncounterMutation,
-    FhirQuestionnaireMutation,
-    FhirQuestionnaireResponseMutation,
-    FhirServiceRequestMutation,
-    FhirMedicationRequestMutation,
-    FhirObservationMutation,
-    FhirDiagnosticReportMutation,
-):
-    """Root GraphQL mutation type — merges every resource's mutation fields via mixin inheritance."""
+def _compose(enabled: list[str]) -> tuple[type, type | None]:
+    query_bases: list[type] = []
+    mutation_bases: list[type] = []
+    for name in enabled:
+        package, query_name, mutation_name = RESOURCES[name]
+        query_bases.append(
+            getattr(importlib.import_module(f"app.gql.{package}.queries"), query_name)
+        )
+        mutation_bases.append(
+            getattr(importlib.import_module(f"app.gql.{package}.mutations"), mutation_name)
+        )
+
+    # GraphQL requires a Query root with at least one field — TestQuery.hello
+    # is always present so an empty routes.enabled still yields a valid schema.
+    query = strawberry.type(
+        type(
+            "Query",
+            (*query_bases, TestQuery),
+            {"__doc__": "Root GraphQL query type — composed from routes.enabled."},
+        )
+    )
+    mutation = (
+        strawberry.type(
+            type(
+                "Mutation",
+                tuple(mutation_bases),
+                {"__doc__": "Root GraphQL mutation type — composed from routes.enabled."},
+            )
+        )
+        if mutation_bases
+        else None
+    )
+    return query, mutation
+
+
+Query, Mutation = _compose(_enabled_resources())
 
 
 @strawberry.type
