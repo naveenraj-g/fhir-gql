@@ -1,0 +1,17 @@
+
+ ⚡️ Starting FastAPI in development mode
+ 
+ 🐍 Using import string: app.main:app
+ 
+ 🌐 Server started at http://127.0.0.1:8010
+    Documentation at http://127.0.0.1:8010/docs
+ 
+  Logs:
+ 
+{"timestamp": "2026-10-20 22:20:52,027", "level": "INFO", "logger": "app.main", "message": "Redis connected", "url": "redis://localhost:6380/0"}
+INFO:     127.0.0.1:51084 - "GET /health HTTP/1.1" 200 OK
+{"timestamp": "2026-10-20 22:20:52,422", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:20:58,831", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:20:59,194", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:20:59,554", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:20:59,960", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}

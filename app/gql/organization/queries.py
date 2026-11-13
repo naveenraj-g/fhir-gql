@@ -3,6 +3,26 @@ Query fields for the Organization resource — one canonical, genuinely
 FHIR R4-shaped Organization regardless of which connector (internal,
 medplum, ...) is actually active. See app.gql.organization's package
 docstring for the overall idea.
+
+Search follows FHIR R4 search (https://www.hl7.org/fhir/R4/search.html) —
+both backends implement it, so the arguments mean the same thing on either:
+
+- Every FHIR R4 Organization search parameter
+  (https://www.hl7.org/fhir/R4/organization.html#search) is a typed
+  argument, named per the FHIR GraphQL convention (`-` -> `_`, here then
+  camelCased: `address-city` -> `addressCity`), plus `_id` (`id`) and
+  `_lastUpdated` (`lastUpdated`). Values use FHIR value syntax unchanged:
+  comma = OR, `system|code` for tokens, `ge2024-01-01` for dates.
+- `params` reaches everything else — modifiers (`name:exact`), chains
+  (`partof.name`), `_summary`, `_elements`, or repeating a parameter to AND it.
+- Paging/sorting/includes are their own arguments (`count`, `offset`,
+  `sort`, `total`, `include`, `revinclude`).
+
+Two queries share all of that:
+- `searchFhirOrganizations` returns the whole searchset (total, includes,
+  paging, warnings) as FhirOrganizationSearchResult.
+- `getFhirOrganizations` is the older list-only form: same filters, just
+  the matching Organizations.
 """
 
 from typing import Annotated
@@ -13,18 +33,52 @@ from app.connectors.translator_registry import active_organization_translator
 from app.fhir.schemas.organization import FhirOrgResponse
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
+from app.gql.organization.search_params import (
+    ActiveArg,
+    AddressArg,
+    AddressCityArg,
+    AddressCountryArg,
+    AddressPostalCodeArg,
+    AddressStateArg,
+    AddressUseArg,
+    EndpointArg,
+    IdentifierArg,
+    IncludeArg,
+    NameArg,
+    PartofArg,
+    PhoneticArg,
+    RevincludeArg,
+    TypeArg,
+    fhir_filters,
+)
 from app.gql.organization.types.response import FhirOrganizationType
+from app.gql.organization.types.search import FhirOrganizationSearchResult
 from app.gql.permissions import require_gql_permission
+from app.gql.search import (
+    CountArg,
+    IdArg,
+    LastUpdatedArg,
+    OffsetArg,
+    ParamsArg,
+    SortArg,
+    TotalArg,
+    bundle_links,
+    run_fhir_search,
+)
 
 
-def _entries_from_bundle(bundle: dict) -> list[dict]:
-    """A FHIR search response is a Bundle regardless of backend — pull out
-    each entry's resource. Falls back to treating the response itself as a
-    single resource if it isn't a Bundle (defensive; both of today's
-    connectors always return a Bundle for a collection GET)."""
-    if bundle.get("resourceType") == "Bundle":
-        return [entry["resource"] for entry in bundle.get("entry") or []]
-    return [bundle]
+async def _run_search(info, **search):
+    """One Organization FHIR search on the active connector — see
+    app.gql.search.run_fhir_search."""
+    return await run_fhir_search(
+        info, resource="organization", translator=active_organization_translator(), **search
+    )
+
+
+def _organization(resource: dict) -> FhirOrganizationType:
+    """One FHIR Organization dict -> its GraphQL type (validated through
+    the canonical Pydantic model first)."""
+    return FhirOrganizationType.from_pydantic(FhirOrgResponse.model_validate(resource))
 
 
 @strawberry.type(description="Query fields for the Organization resource.")
@@ -47,125 +101,120 @@ class FhirOrganizationQuery:
         raw = await connector.get(
             translator.item_path(id), accept=translator.accept, actor=actor
         )
-        data = translator.from_wire(raw)
-        return FhirOrganizationType.from_pydantic(FhirOrgResponse.model_validate(data))
+        return _organization(translator.from_wire(raw))
 
     @strawberry.field(
         description=(
-            "Search Organizations, in genuine FHIR R4 shape, with the full "
-            "FHIR R4 Organization search parameter set "
-            "(https://hl7.org/fhir/R4/organization.html#search), minus "
-            "`phonetic` — neither backend implements phonetic matching — "
-            "plus limit/offset pagination. Requires the `organization:read` "
-            "permission."
+            "FHIR R4 search over Organizations (https://www.hl7.org/fhir/R4/search.html), returning "
+            "the whole result: matching Organizations, `include`/`revinclude`d resources, the total "
+            "match count, paging (`nextOffset`, links) and any warnings. Every R4 Organization search "
+            "parameter is a typed argument; `params` adds modifiers, chains and anything else FHIR "
+            "search accepts. Requires the `organization:read` permission."
+        )
+    )
+    @translate_errors
+    async def search_fhir_organizations(
+        self,
+        info: strawberry.types.Info,
+        id: IdArg = None,
+        last_updated: LastUpdatedArg = None,
+        name: NameArg = None,
+        phonetic: PhoneticArg = None,
+        active: ActiveArg = None,
+        identifier: IdentifierArg = None,
+        type: TypeArg = None,
+        address: AddressArg = None,
+        address_city: AddressCityArg = None,
+        address_state: AddressStateArg = None,
+        address_postal_code: AddressPostalCodeArg = None,
+        address_country: AddressCountryArg = None,
+        address_use: AddressUseArg = None,
+        partof: PartofArg = None,
+        endpoint: EndpointArg = None,
+        params: ParamsArg = None,
+        count: CountArg = 50,
+        offset: OffsetArg = 0,
+        sort: SortArg = None,
+        total: TotalArg = None,
+        include: IncludeArg = None,
+        revinclude: RevincludeArg = None,
+    ) -> FhirOrganizationSearchResult:
+        """Mirrors GET /Organization?... and returns the whole searchset."""
+        result = await _run_search(
+            info,
+            filters=fhir_filters(
+                id=id, last_updated=last_updated, name=name, phonetic=phonetic,
+                active=active, identifier=identifier, type=type, address=address,
+                address_city=address_city, address_state=address_state,
+                address_postal_code=address_postal_code, address_country=address_country,
+                address_use=address_use, partof=partof, endpoint=endpoint,
+            ),
+            params=params, count=count, offset=offset, sort=sort, total=total,
+            include=include, revinclude=revinclude,
+        )
+        return FhirOrganizationSearchResult(
+            total=result.total,
+            organizations=[_organization(r) for r in result.matches],
+            # Only Organization includes can be typed; every include (any
+            # resource type) is still available raw in `included`.
+            included_organizations=[
+                _organization(r)
+                for r in result.included
+                if r.get("resourceType") == "Organization"
+            ],
+            included=result.included,
+            next_offset=result.next_offset,
+            links=bundle_links(result),
+            warnings=result.warnings,
+        )
+
+    @strawberry.field(
+        description=(
+            "Search Organizations and return just the matching page, in genuine FHIR R4 shape — the "
+            "same FHIR R4 search and filters as `searchFhirOrganizations` (use that one for the "
+            "total, includes, paging and warnings). Requires the `organization:read` permission."
         )
     )
     @translate_errors
     async def get_fhir_organizations(
         self,
         info: strawberry.types.Info,
-        name: Annotated[
-            str | None,
-            strawberry.argument(
-                description="Partial match against Organization.name or any alias."
-            ),
-        ] = None,
-        active: Annotated[
-            bool | None,
-            strawberry.argument(description="Filter by Organization.active."),
-        ] = None,
-        identifier: Annotated[
-            str | None,
-            strawberry.argument(
-                description="Exact match on a business identifier value."
-            ),
-        ] = None,
-        type: Annotated[
-            str | None,
-            strawberry.argument(
-                name="type",
-                description="Exact match on a coded Organization.type.",
-            ),
-        ] = None,
-        address: Annotated[
-            str | None,
-            strawberry.argument(
-                description="Partial match against any Address sub-field (line, city, district, state, country, postalCode, text)."
-            ),
-        ] = None,
-        address_city: Annotated[
-            str | None,
-            strawberry.argument(description="Filter by address city — partial match."),
-        ] = None,
-        address_state: Annotated[
-            str | None,
-            strawberry.argument(
-                description="Filter by address state — partial match."
-            ),
-        ] = None,
-        address_postal_code: Annotated[
-            str | None,
-            strawberry.argument(
-                description="Filter by address postal code — exact match."
-            ),
-        ] = None,
-        address_country: Annotated[
-            str | None,
-            strawberry.argument(
-                description="Filter by address country — partial match."
-            ),
-        ] = None,
-        address_use: Annotated[
-            str | None,
-            strawberry.argument(description="home | work | temp | old | billing."),
-        ] = None,
-        partof: Annotated[
-            str | None,
-            strawberry.argument(
-                description="FHIR reference string, e.g. 'Organization/190001'."
-            ),
-        ] = None,
-        endpoint: Annotated[
-            str | None,
-            strawberry.argument(
-                description="FHIR reference string, e.g. 'Endpoint/1'."
-            ),
-        ] = None,
+        id: IdArg = None,
+        last_updated: LastUpdatedArg = None,
+        name: NameArg = None,
+        phonetic: PhoneticArg = None,
+        active: ActiveArg = None,
+        identifier: IdentifierArg = None,
+        type: TypeArg = None,
+        address: AddressArg = None,
+        address_city: AddressCityArg = None,
+        address_state: AddressStateArg = None,
+        address_postal_code: AddressPostalCodeArg = None,
+        address_country: AddressCountryArg = None,
+        address_use: AddressUseArg = None,
+        partof: PartofArg = None,
+        endpoint: EndpointArg = None,
+        params: ParamsArg = None,
         limit: Annotated[
-            int, strawberry.argument(description="Max results (default 50).")
+            int,
+            strawberry.argument(description="Page size — sent as FHIR `_count` (default 50)."),
         ] = 50,
-        offset: Annotated[
-            int, strawberry.argument(description="Pagination offset (default 0).")
-        ] = 0,
+        offset: OffsetArg = 0,
+        sort: SortArg = None,
     ) -> list[FhirOrganizationType]:
-        """Search Organizations — mirrors GET /Organization?name=...&active=..."""
-        actor = require_gql_permission(info, "organization", "read")
-        connector = get_container(info).core.fhir_client()
-        translator = active_organization_translator()
-        params = translator.list_params(
-            name,
-            active,
-            identifier,
-            type,
-            address,
-            address_city,
-            address_state,
-            address_postal_code,
-            address_country,
-            address_use,
-            partof,
-            endpoint,
-            limit,
-            offset,
+        """Mirrors GET /Organization?... — the matches only. `limit` keeps
+        this query's original argument name (it is FHIR's `_count`), so
+        existing callers don't break."""
+        result = await _run_search(
+            info,
+            filters=fhir_filters(
+                id=id, last_updated=last_updated, name=name, phonetic=phonetic,
+                active=active, identifier=identifier, type=type, address=address,
+                address_city=address_city, address_state=address_state,
+                address_postal_code=address_postal_code, address_country=address_country,
+                address_use=address_use, partof=partof, endpoint=endpoint,
+            ),
+            params=params, count=limit, offset=offset, sort=sort, total=None,
+            include=None, revinclude=None,
         )
-        raw = await connector.get(
-            translator.list_path(),
-            params=params,
-            accept=translator.accept,
-            actor=actor,
-        )
-        resources = _entries_from_bundle(translator.from_wire(raw))
-        return [
-            FhirOrganizationType.from_pydantic(FhirOrgResponse.model_validate(r))
-            for r in resources
-        ]
+        return [_organization(r) for r in result.matches]

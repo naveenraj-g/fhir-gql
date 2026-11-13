@@ -12,6 +12,8 @@ app.connectors.medplum.json_patch's docstring for why PATCH can't be a
 pass-through here either.
 """
 
+# Shared with the internal translator: both backends speak FHIR R4 search.
+from app.connectors.fhir_search import build_search_params
 from app.connectors.medplum.json_patch import to_json_patch
 
 
@@ -26,62 +28,12 @@ class MedplumLocationTranslator:
     def list_path(self) -> str:
         return "/Location"
 
-    def list_params(
-        self,
-        name: str | None,
-        identifier: str | None,
-        status: str | None,
-        operational_status: str | None,
-        location_type: str | None,
-        address: str | None,
-        address_city: str | None,
-        address_state: str | None,
-        address_postal_code: str | None,
-        address_country: str | None,
-        address_use: str | None,
-        organization: str | None,
-        partof: str | None,
-        endpoint: str | None,
-        near: str | None,
-        limit: int,
-        offset: int,
-    ) -> dict:
-        """Medplum speaks genuine FHIR R4 search params natively, so these
-        are passed straight through under their real spec names — no
-        renaming needed, unlike the internal connector's own flattened
-        pagination (`_count`/`_offset` here vs `limit`/`offset` there)."""
-        params: dict = {"_count": limit, "_offset": offset}
-        if name is not None:
-            params["name"] = name
-        if identifier is not None:
-            params["identifier"] = identifier
-        if status is not None:
-            params["status"] = status
-        if operational_status is not None:
-            params["operational-status"] = operational_status
-        if location_type is not None:
-            params["type"] = location_type
-        if address is not None:
-            params["address"] = address
-        if address_city is not None:
-            params["address-city"] = address_city
-        if address_state is not None:
-            params["address-state"] = address_state
-        if address_postal_code is not None:
-            params["address-postalcode"] = address_postal_code
-        if address_country is not None:
-            params["address-country"] = address_country
-        if address_use is not None:
-            params["address-use"] = address_use
-        if organization is not None:
-            params["organization"] = organization
-        if partof is not None:
-            params["partof"] = partof
-        if endpoint is not None:
-            params["endpoint"] = endpoint
-        if near is not None:
-            params["near"] = near
-        return params
+    def search_params(self, **search) -> dict[str, list[str]]:
+        """FHIR R4 search arguments -> query parameters. Medplum speaks
+        genuine FHIR R4 search natively, so this is
+        app.connectors.fhir_search.build_search_params() unchanged — see
+        that function for the keyword arguments."""
+        return build_search_params(**search)
 
     def from_wire(self, raw: dict) -> dict:
         return raw

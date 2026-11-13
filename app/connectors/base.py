@@ -104,14 +104,15 @@ class OrganizationWireTranslator(Protocol):
     keyed off the same `connectors.active` config value as `Connector`
     itself.
 
-    Both of today's connectors already return genuine FHIR R4 JSON for
-    reads — fhir-server via its own `Accept: application/fhir+json` content
-    negotiation, Medplum natively — so `from_wire()` is identity for both.
-    Writes are NOT symmetric with reads: fhir-server's POST/PATCH only ever
-    accept their own flattened plain-JSON shape (see
-    app.connectors.internal.translators.organization's module docstring for
-    the exact field-level mapping), never genuine FHIR JSON, which is why
-    there's a to_wire_create/to_wire_patch pair instead of one to_wire().
+    Both of today's connectors speak genuine FHIR R4 JSON for Organization
+    in both directions — fhir-server stores and serves the resource as-is
+    (Medplum-style `content` storage), Medplum natively — so `from_wire()`
+    and `to_wire_create()` are pass-throughs for both, and search is
+    genuine FHIR R4 search on both (`search_params()` delegates to
+    app.connectors.fhir_search for each). The remaining per-connector
+    differences are the URL paths and PATCH: fhir-server takes a plain
+    merge-patch body, Medplum an RFC 6902 JSON Patch array — which is why
+    there's still a separate to_wire_patch().
     """
 
     #: Accept header to request FHIR R4 shape from this backend, or None if
@@ -127,27 +128,13 @@ class OrganizationWireTranslator(Protocol):
         backend's own convention."""
         ...
 
-    def list_params(
-        self,
-        name: str | None,
-        active: bool | None,
-        identifier: str | None,
-        org_type: str | None,
-        address: str | None,
-        address_city: str | None,
-        address_state: str | None,
-        address_postal_code: str | None,
-        address_country: str | None,
-        address_use: str | None,
-        partof: str | None,
-        endpoint: str | None,
-        limit: int,
-        offset: int,
-    ) -> dict:
-        """Canonical filter/pagination args -> this backend's own query param
-        names. The filter set mirrors FHIR R4's own Organization search
-        parameters (https://hl7.org/fhir/R4/organization.html#search) minus
-        `phonetic` — neither backend implements phonetic matching today."""
+    def search_params(self, **search) -> dict[str, list[str]]:
+        """FHIR R4 search arguments (see
+        app.connectors.fhir_search.build_search_params for the keyword
+        arguments) -> this backend's own query parameters, as
+        `{name: [value, ...]}` (a repeated name ANDs). Both of today's
+        backends speak genuine FHIR R4 search, so both implementations
+        delegate to build_search_params() unchanged."""
         ...
 
     def from_wire(self, raw: dict) -> dict:
@@ -178,12 +165,12 @@ class LocationWireTranslator(Protocol):
     app.connectors.translator_registry.active_location_translator(), keyed
     off the same `connectors.active` config value as `Connector` itself.
 
-    Location has no top-level `active` field (unlike Organization), so
-    there's no `active` filter in list_params below. There is also no
-    `physical_type` filter, deliberately — physicalType is a real Location
-    field, but it was never a registered FHIR R4 SearchParameter for
-    Location, so it's excluded to keep this filter set exactly the real 15
-    R4 search parameters: https://hl7.org/fhir/R4/location.html#search.
+    Both connectors speak genuine FHIR R4 JSON for Location in both
+    directions and genuine FHIR R4 search (the 15 parameters at
+    https://hl7.org/fhir/R4/location.html#search, plus modifiers, chaining
+    and result parameters) — so the remaining per-connector differences are
+    the URL paths and PATCH (plain merge-patch body vs. Medplum's RFC 6902
+    JSON Patch array).
     """
 
     accept: str | None
@@ -197,29 +184,12 @@ class LocationWireTranslator(Protocol):
         backend's own convention."""
         ...
 
-    def list_params(
-        self,
-        name: str | None,
-        identifier: str | None,
-        status: str | None,
-        operational_status: str | None,
-        location_type: str | None,
-        address: str | None,
-        address_city: str | None,
-        address_state: str | None,
-        address_postal_code: str | None,
-        address_country: str | None,
-        address_use: str | None,
-        organization: str | None,
-        partof: str | None,
-        endpoint: str | None,
-        near: str | None,
-        limit: int,
-        offset: int,
-    ) -> dict:
-        """Canonical filter/pagination args -> this backend's own query
-        param names. The filter set mirrors FHIR R4's own Location search
-        parameters (https://hl7.org/fhir/R4/location.html#search)."""
+    def search_params(self, **search) -> dict[str, list[str]]:
+        """FHIR R4 search arguments (see
+        app.connectors.fhir_search.build_search_params) -> this backend's
+        own query parameters, as `{name: [value, ...]}`. Both of today's
+        backends speak genuine FHIR R4 search for Location, so both
+        implementations delegate to build_search_params() unchanged."""
         ...
 
     def from_wire(self, raw: dict) -> dict:

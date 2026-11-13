@@ -1,0 +1,23 @@
+
+ ⚡️ Starting FastAPI in development mode
+ 
+ 🐍 Using import string: app.main:app
+ 
+ 🌐 Server started at http://127.0.0.1:8012
+    Documentation at http://127.0.0.1:8012/docs
+ 
+  Logs:
+ 
+{"timestamp": "2026-10-20 22:32:46,064", "level": "INFO", "logger": "app.main", "message": "Redis connected", "url": "redis://localhost:6380/0"}
+INFO:     127.0.0.1:51486 - "GET /health HTTP/1.1" 200 OK
+{"timestamp": "2026-10-20 22:32:48,217", "level": "INFO", "logger": "watchfiles.main", "message": "2 changes detected"}
+{"timestamp": "2026-10-20 22:32:48,570", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:48,975", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:49,379", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:49,780", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:50,184", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:50,592", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:50,996", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:51,399", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:51,802", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}
+{"timestamp": "2026-10-20 22:32:52,206", "level": "INFO", "logger": "watchfiles.main", "message": "1 change detected"}

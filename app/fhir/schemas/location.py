@@ -33,8 +33,9 @@ FHIR R4 Location resource spec: https://hl7.org/fhir/R4/location.html
 """
 
 from decimal import Decimal
+from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, PlainSerializer
 
 from app.fhir.schemas.datatypes import (
     FhirAddress,
@@ -47,18 +48,25 @@ from app.fhir.schemas.datatypes import (
 )
 
 
+# A FHIR `decimal`: kept as Decimal in Python (and exposed as the GraphQL
+# Decimal scalar), but written to the wire as a JSON *number*. Pydantic's
+# JSON mode would otherwise emit a Decimal as a string ("18.9258"), which
+# FHIR rejects ("the primitive value must be a number").
+FhirDecimal = Annotated[Decimal, PlainSerializer(float, return_type=float, when_used="json")]
+
+
 class FhirLocationPosition(BaseModel):
     """Location.position — the absolute geographic location (BackboneElement).
     longitude/latitude are 1..1 *within* position in the spec, but both stay
     optional here since position itself is 0..1 at the resource level."""
 
-    longitude: Decimal | None = Field(
+    longitude: FhirDecimal | None = Field(
         default=None, description="Longitude with WGS84 datum"
     )
-    latitude: Decimal | None = Field(
+    latitude: FhirDecimal | None = Field(
         default=None, description="Latitude with WGS84 datum"
     )
-    altitude: Decimal | None = Field(
+    altitude: FhirDecimal | None = Field(
         default=None, description="Altitude with WGS84 datum"
     )
 

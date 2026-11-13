@@ -139,16 +139,18 @@ class FhirOrganizationInput(BaseModel):
     `id: str` mutation argument on update; create doesn't take one at all).
 
     Used as-is for BOTH create and update: fhir-server's own
-    OrganizationCreateSchema/OrganizationPatchSchema are themselves nearly
-    identical (Organization has no required-at-this-layer fields), so
-    there is no create-vs-patch shape difference to encode here either.
-    Any field a connector's translator can't reach on write (e.g. a
-    Reference's logical-identifier fallback — fhir-server's
-    partof_identifier_*/assigner_identifier_*/reference_identifier_*,
-    since FhirReference/FhirIdentifier.assigner don't carry one) is simply
-    left unset by that translator — see
-    app.connectors.internal.translators.organization and
+    OrganizationCreateSchema/OrganizationPatchSchema accept exactly the
+    same FHIR R4 fields (Organization has no required-at-this-layer
+    fields), so there is no create-vs-patch shape difference to encode
+    here either. Both connectors take this shape as their wire body
+    unchanged — see app.connectors.internal.translators.organization and
     app.connectors.medplum.translators.organization.
+
+    Known gap: FhirReference has no `identifier`, so a Reference's
+    logical-identifier fallback (partOf/endpoint/identifier.assigner
+    `.identifier`) can't be written through GraphQL yet, even though
+    fhir-server now accepts it as genuine FHIR. Adding it to the shared
+    FhirReference datatype would close that for every resource at once.
     """
 
     active: bool | None = Field(default=None)
