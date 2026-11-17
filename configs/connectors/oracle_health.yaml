@@ -1,0 +1,27 @@
+# Connector settings for Oracle Health (Cerner Millennium) FHIR R4, the public
+# sandbox by default. See app/connectors/oracle_health/client.py and README.md.
+#
+# Secrets are deliberately NOT here. Set them as real env vars (e.g. in .env):
+#   CONNECTORS__ORACLE_HEALTH__CLIENT_ID         system account ID (Cerner Central)
+#   CONNECTORS__ORACLE_HEALTH__CLIENT_SECRET     only for auth_method: client_secret
+#   CONNECTORS__ORACLE_HEALTH__PRIVATE_KEY_PATH  only for auth_method: private_key_jwt
+# (the private key file lives under secrets/, gitignored, never committed).
+#
+# auth_method picks how the gateway logs in:
+#   client_secret    - account ID + secret as HTTP Basic (Oracle's documented default)
+#   private_key_jwt  - RS384-signed JWT; the matching public JWKS must be registered
+#                      on the Cerner Central system account
+#
+# {tenant_id} is filled into both URLs. The sandbox tenant below is Oracle's public
+# one; a real health system has its own tenant id.
+#
+# scope: Oracle needs every scope listed explicitly (no wildcards). Add
+# system/Organization.write only if you want Organization create; Location and
+# Organization update/delete are not available in Oracle at all.
+connectors:
+  oracle_health:
+    tenant_id: ec2458f2-1e24-41c8-b71b-0e701af7583d
+    base_url: https://fhir-ehr-code.cerner.com/r4/{tenant_id}
+    token_url: https://authorization.cerner.com/tenants/{tenant_id}/protocols/oauth2/profiles/smart-v1/token
+    auth_method: client_secret
+    scope: "system/Organization.read system/Organization.write system/Location.read"

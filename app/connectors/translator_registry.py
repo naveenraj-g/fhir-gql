@@ -34,6 +34,10 @@ from app.connectors.openemr.translators import (
     OpenEmrLocationTranslator,
     OpenEmrOrganizationTranslator,
 )
+from app.connectors.oracle_health.translators import (
+    OracleHealthLocationTranslator,
+    OracleHealthOrganizationTranslator,
+)
 from app.core.config import settings
 
 ORGANIZATION_TRANSLATORS = {
@@ -41,6 +45,7 @@ ORGANIZATION_TRANSLATORS = {
     "medplum": MedplumOrganizationTranslator(),
     "openemr": OpenEmrOrganizationTranslator(),
     "epic": EpicOrganizationTranslator(),
+    "oracle_health": OracleHealthOrganizationTranslator(),
 }
 
 LOCATION_TRANSLATORS = {
@@ -48,6 +53,7 @@ LOCATION_TRANSLATORS = {
     "medplum": MedplumLocationTranslator(),
     "openemr": OpenEmrLocationTranslator(),
     "epic": EpicLocationTranslator(),
+    "oracle_health": OracleHealthLocationTranslator(),
 }
 
 

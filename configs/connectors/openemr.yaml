@@ -17,4 +17,6 @@ connectors:
   openemr:
     base_url: http://localhost/apis/default/fhir
     token_url: http://localhost/oauth2/default/token
+    # private_key_jwt (needed for system scopes) or client_secret
+    auth_method: private_key_jwt
     scope: "system/Organization.read system/Location.read"

@@ -97,6 +97,11 @@ just dev                       # uvicorn app.main:app --port 8005 --reload
   (verified live): with these system scopes it is **read-only** here (writes answer 405). `epic` is read-only too. Location has no write routes,
   Organization has no delete, and Organization create/update need an admin user login that system
   scopes can't provide (401). Scopes are `connectors.openemr.scope`.
+- **Login to each backend** is set by `auth_method` in `configs/connectors/<name>.yaml`, handled by one shared
+  `app/connectors/token_manager.py`: `token_passthrough` (internal: forwards the caller's JWT), `client_secret`
+  (client id + secret) or `private_key_jwt` (signed JWT checked against a registered public JWKS). A backend that
+  supports both can switch with one line. Credentials are env vars (`CONNECTORS__<NAME>__CLIENT_ID`, `…__CLIENT_SECRET`,
+  `…__PRIVATE_KEY_PATH`), never the YAML.
 - Any setting can be overridden by an environment variable using `__` for nesting.
 
 ## Extending with another resource

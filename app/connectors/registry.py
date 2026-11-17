@@ -14,7 +14,7 @@ Adding a second connector (e.g. Medplum): write `app/connectors/medplum/`
 docstring) satisfying the Connector Protocol, add
 `"medplum": MedplumConnector` below, add `"medplum"` to the `active`
 Literal in app/core/config.py's ConnectorsConfig, and add its own
-`configs/connectors/medplum.yaml` for checked-in behavior (auth_mode,
+`configs/connectors/medplum.yaml` for checked-in behavior (auth_method,
 etc. — see InternalConnectorConfig for the pattern; real secrets like
 client_id/secret are env vars, never committed YAML).
 """
@@ -23,6 +23,7 @@ from app.connectors.epic import EpicConnector
 from app.connectors.internal import InternalConnector
 from app.connectors.medplum import MedplumConnector
 from app.connectors.openemr import OpenEmrConnector
+from app.connectors.oracle_health import OracleHealthConnector
 
 CONNECTORS = {
     # "This application" — our own fhir-server. Named "internal" (not
@@ -42,4 +43,7 @@ CONNECTORS = {
     # Epic on FHIR (R4), read-only, SMART Backend Services signed-JWT login.
     # See app.connectors.epic.
     "epic": EpicConnector,
+    # Oracle Health (Cerner Millennium) FHIR R4 - client secret or signed-JWT
+    # login chosen by config. See app.connectors.oracle_health.
+    "oracle_health": OracleHealthConnector,
 }

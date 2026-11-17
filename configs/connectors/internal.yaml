@@ -13,22 +13,15 @@
 # an external EMR connector's client_id/secret, committing a dev default
 # here is fine.
 
-# How this connector authenticates to its backend:
-#   token_passthrough        — forward the inbound caller's own bearer JWT
-#                               as-is (app.auth.models.AuthUser.token). Legal
-#                               here because fhir-server validates JWTs
-#                               against the SAME IAM this gateway does (see
-#                               fhir-server's CLAUDE.md "Auth rollout
-#                               status") — there is no separate
-#                               token-acquisition step, and no client_id/
-#                               secret of this connector's own.
-#   oauth_client_credentials  — this gateway authenticates as itself, using
-#                               its own client_id/secret (or per-provider
-#                               equivalent — e.g. Epic's JWT-bearer SMART
-#                               backend-services flow), independent of which
-#                               end-user is calling. Every external EMR/EHR
-#                               connector (Epic, Cerner, ...) needs this
-#                               instead of token_passthrough.
+# How this connector authenticates (auth_method):
+#   token_passthrough - forward the inbound caller's own bearer JWT as-is
+#                       (app.auth.models.AuthUser.token). Legal here because
+#                       fhir-server validates JWTs against the SAME IAM this
+#                       gateway does, so there is no token acquisition and no
+#                       client id/secret of this connector's own. This is the
+#                       only value for the internal connector; every external
+#                       connector instead picks client_secret or private_key_jwt
+#                       (see app/connectors/token_manager.py).
 #
 # Nested under connectors.internal because YamlConfigSettingsSource maps
 # this file's structure directly onto Settings' own nested fields (it does
@@ -37,4 +30,4 @@
 connectors:
   internal:
     base_url: http://localhost:8001/api/fhir/v1
-    auth_mode: token_passthrough
+    auth_method: token_passthrough

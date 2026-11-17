@@ -14,7 +14,7 @@ mirrors fhir-server's own app/core/config.py precedence and split:
      touching code. `configs/connectors/<name>.yaml` sits alongside it at
      the same precedence tier — one file per entry in
      app.connectors.registry.CONNECTORS, holding that connector's own
-     settings (base_url, auth_mode, ...) instead of crowding every
+     settings (base_url, auth_method, ...) instead of crowding every
      connector's settings into one flat file. Secrets a connector needs
      (client_id/secret, token_url, ...) are never committed YAML — they're
      real env vars using the `__` nesting delimiter below, same as
@@ -52,75 +52,88 @@ class AppConfig(BaseModel):
 
 
 class InternalConnectorConfig(BaseModel):
-    """Checked-in behavior for the internal connector (our own fhir-server —
-    see app.connectors.internal for why it's named "internal", not
-    "fhir_server") — see configs/connectors/internal.yaml (loaded alongside
-    configs/config.yaml, see settings_customise_sources() below) for the
-    full field-by-field rationale. base_url lives here rather than as a flat
-    Settings field, so everything about this one connector — including
-    which deployment it points at — stays in its own file; override it
-    per-environment with the real env var CONNECTORS__INTERNAL__BASE_URL
-    rather than editing the committed default."""
+    """Checked-in behavior for the internal connector (our own fhir-server -
+    see app.connectors.internal for why it's named "internal"). See
+    configs/connectors/internal.yaml. base_url lives here so everything about
+    this one connector stays in its own file; override per environment with
+    CONNECTORS__INTERNAL__BASE_URL.
+
+    auth_method is always "token_passthrough": the caller's own inbound JWT is
+    forwarded and no token is acquired (fhir-server trusts the same IAM)."""
 
     base_url: str = "http://localhost:8001/api/fhir/v1"
-    auth_mode: Literal["token_passthrough", "oauth_client_credentials"] = (
-        "token_passthrough"
-    )
+    auth_method: Literal["token_passthrough"] = "token_passthrough"
 
 
-class MedplumConnectorConfig(BaseModel):
-    """Checked-in behavior for the medplum connector — a genuinely
-    FHIR-R4-compliant external backend, registered but not active by
-    default. See configs/connectors/medplum.yaml for the full
-    field-by-field rationale.
+class OAuthClientConfig(BaseModel):
+    """The login settings every EXTERNAL connector shares; each connector's own
+    config adds its URLs on top. app.connectors.token_manager.build_token_manager
+    turns these into the right token manager.
 
-    client_id/client_secret default to "" deliberately — never give them a
-    real committed default. app.connectors.medplum.token_manager.
-    MedplumTokenManager raises at construction time if either is empty, so
-    a deployment that sets connectors.active: medplum without also setting
-    CONNECTORS__MEDPLUM__CLIENT_ID/_SECRET fails loudly at startup instead
-    of silently 401ing on first use."""
+    auth_method:
+      client_secret   - client id + secret (needs client_id, client_secret)
+      private_key_jwt - signed-JWT login (needs client_id, private_key_path; the
+                        matching public JWKS is registered with the backend)
+
+    client_id / client_secret / private_key_path are real secrets or secret
+    paths: env vars only (CONNECTORS__<NAME>__CLIENT_ID etc.), never committed
+    YAML. They default to "" so a connector that isn't active costs nothing; the
+    token manager raises at construction if the ones the chosen method needs are
+    empty, so a misconfigured active connector fails at startup, not on first use.
+    """
+
+    token_url: str
+    auth_method: Literal["client_secret", "private_key_jwt"]
+    scope: str = ""
+    client_id: str = ""
+    client_secret: str = ""
+    private_key_path: str = ""
+
+
+class MedplumConnectorConfig(OAuthClientConfig):
+    """Medplum (genuinely FHIR-R4-compliant external backend). See
+    configs/connectors/medplum.yaml. Logs in with a client secret."""
 
     base_url: str = "http://localhost:8103/fhir/R4"
     token_url: str = "http://localhost:8103/oauth2/token"
-    auth_mode: Literal["token_passthrough", "oauth_client_credentials"] = (
-        "oauth_client_credentials"
-    )
-    # Real secrets — always env vars (CONNECTORS__MEDPLUM__CLIENT_ID /
-    # CONNECTORS__MEDPLUM__CLIENT_SECRET), never configs/connectors/medplum.yaml.
-    client_id: str = ""
-    client_secret: str = ""
+    auth_method: Literal["client_secret", "private_key_jwt"] = "client_secret"
 
 
-class OpenEmrConnectorConfig(BaseModel):
-    """Checked-in behavior for the openemr connector (OpenEMR's standard FHIR
-    R4 API, system scopes + signed-JWT client login). See
-    configs/connectors/openemr.yaml.
-
-    client_id/private_key_path default to "" - real per-environment values,
-    env vars only (CONNECTORS__OPENEMR__CLIENT_ID / _PRIVATE_KEY_PATH).
-    OpenEmrTokenManager raises at construction if either is empty, so a
-    deployment with connectors.active: openemr but no credentials fails at
-    startup instead of 401ing on first use."""
+class OpenEmrConnectorConfig(OAuthClientConfig):
+    """OpenEMR standard FHIR R4 API (system scopes). See
+    configs/connectors/openemr.yaml. System scopes need the signed-JWT login."""
 
     base_url: str = "http://localhost/apis/default/fhir"
     token_url: str = "http://localhost/oauth2/default/token"
+    auth_method: Literal["client_secret", "private_key_jwt"] = "private_key_jwt"
     scope: str = "system/Organization.read system/Location.read"
-    client_id: str = ""
-    private_key_path: str = ""
 
 
-class EpicConnectorConfig(BaseModel):
-    """Checked-in behavior for the epic connector (Epic on FHIR R4, read-only,
-    SMART Backend Services signed-JWT login). See configs/connectors/epic.yaml.
-    client_id/private_key_path default to "" - env vars only
-    (CONNECTORS__EPIC__CLIENT_ID / _PRIVATE_KEY_PATH); the token manager
-    raises at construction if either is empty."""
+class EpicConnectorConfig(OAuthClientConfig):
+    """Epic on FHIR R4 (read-only). See configs/connectors/epic.yaml. Epic backend
+    apps use the signed-JWT login; scopes come from the app registration so
+    `scope` stays empty."""
 
     base_url: str = "https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4"
     token_url: str = "https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token"
-    client_id: str = ""
-    private_key_path: str = ""
+    auth_method: Literal["client_secret", "private_key_jwt"] = "private_key_jwt"
+
+
+class OracleHealthConnectorConfig(OAuthClientConfig):
+    """Oracle Health / Cerner Millennium FHIR R4. See
+    configs/connectors/oracle_health.yaml. Either login works; {tenant_id} is
+    filled into both URLs."""
+
+    tenant_id: str = "ec2458f2-1e24-41c8-b71b-0e701af7583d"
+    base_url: str = "https://fhir-ehr-code.cerner.com/r4/{tenant_id}"
+    token_url: str = (
+        "https://authorization.cerner.com/tenants/{tenant_id}"
+        "/protocols/oauth2/profiles/smart-v1/token"
+    )
+    auth_method: Literal["client_secret", "private_key_jwt"] = "client_secret"
+    scope: str = (
+        "system/Organization.read system/Organization.write system/Location.read"
+    )
 
 
 class ConnectorsConfig(BaseModel):
@@ -137,17 +150,19 @@ class ConnectorsConfig(BaseModel):
     external connector is also a FHIR server in the generic sense) is the
     default. "medplum" (see app.connectors.medplum) is registered as a
     second option — a genuinely FHIR-R4-compliant backend, authenticating
-    via oauth_client_credentials rather than internal's token_passthrough.
+    via a client secret or signed JWT rather than internal's token_passthrough.
     Adding a further connector (e.g. Epic) means writing a package
     satisfying the Protocol (app/connectors/<name>/, not a single file —
     see app.connectors.internal's module docstring), registering it in
     app.connectors.registry.CONNECTORS, adding its own
-    configs/connectors/<name>.yaml for checked-in behavior (auth_mode,
+    configs/connectors/<name>.yaml for checked-in behavior (auth_method,
     etc. — secrets like client_id/secret are real env vars instead, e.g.
     CONNECTORS__EPIC__CLIENT_ID, never committed YAML), and extending the
     Literal below to match — then `active` can be flipped to it."""
 
-    active: Literal["internal", "medplum", "openemr", "epic"] = "internal"
+    active: Literal["internal", "medplum", "openemr", "epic", "oracle_health"] = (
+        "internal"
+    )
 
     # Per-connector behavior sub-config — one field per entry in
     # app.connectors.registry.CONNECTORS, each populated from its own
@@ -158,6 +173,9 @@ class ConnectorsConfig(BaseModel):
     medplum: MedplumConnectorConfig = Field(default_factory=MedplumConnectorConfig)
     openemr: OpenEmrConnectorConfig = Field(default_factory=OpenEmrConnectorConfig)
     epic: EpicConnectorConfig = Field(default_factory=EpicConnectorConfig)
+    oracle_health: OracleHealthConnectorConfig = Field(
+        default_factory=OracleHealthConnectorConfig
+    )
 
 
 class CorsConfig(BaseModel):
@@ -340,6 +358,11 @@ class Settings(BaseSettings):
             yaml_file="configs/connectors/epic.yaml",
             yaml_file_encoding="utf-8",
         )
+        oracle_health_yaml_settings = YamlConfigSettingsSource(
+            settings_cls,
+            yaml_file="configs/connectors/oracle_health.yaml",
+            yaml_file_encoding="utf-8",
+        )
         return (
             init_settings,
             env_settings,
@@ -349,6 +372,7 @@ class Settings(BaseSettings):
             medplum_yaml_settings,
             openemr_yaml_settings,
             epic_yaml_settings,
+            oracle_health_yaml_settings,
             file_secret_settings,
         )
 

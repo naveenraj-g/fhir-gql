@@ -32,7 +32,7 @@ pool is shared and reused across all requests. `aclose()` must be called
 during application shutdown to drain the pool cleanly.
 
 Auth mode — see configs/connectors/internal.yaml
-(`connectors.internal.auth_mode`): this connector always forwards the
+(`connectors.internal.auth_method`): this connector always forwards the
 caller's own inbound bearer JWT as-is (`actor.token`, below) rather than
 acquiring a separate credential of its own. That's only legal because
 fhir-server validates JWTs against the SAME IAM this gateway does (see

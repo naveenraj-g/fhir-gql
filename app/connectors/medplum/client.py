@@ -7,7 +7,7 @@ dev-docs/17-static-architecture-and-generic-fhir-payloads.md).
 Unlike InternalConnector (our own fhir-server, token_passthrough auth — see
 app.connectors.internal.client), this connector authenticates as *itself*
 via OAuth2 client_credentials
-(app.connectors.medplum.token_manager.MedplumTokenManager) — Medplum has
+(app.connectors.token_manager, per `connectors.medplum.auth_method`) — Medplum has
 its own authorization server and has never heard of our IAM, so the
 caller's inbound JWT (actor.token) is never forwarded here. `actor` is
 still accepted on every method, for Connector Protocol conformance and
@@ -33,7 +33,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.auth.models import AuthUser
-from app.connectors.medplum.token_manager import MedplumTokenManager
+from app.connectors.token_manager import build_token_manager
 from app.core.logging import trace_methods
 
 
@@ -45,28 +45,29 @@ class MedplumConnector:
     """
 
     def __init__(
-        self, base_url: str, token_url: str, client_id: str, client_secret: str
+        self,
+        base_url: str,
+        token_url: str,
+        auth_method: str,
+        client_id: str,
+        client_secret: str,
+        private_key_path: str,
+        scope: str,
     ) -> None:
-        """
-        Args:
-            base_url: Medplum's FHIR R4 base (e.g. http://localhost:8103/fhir/R4).
-            token_url: Medplum's OAuth2 token endpoint
-                       (e.g. http://localhost:8103/oauth2/token).
-            client_id: This connector's own Medplum ClientApplication ID —
-                       see Project Admin -> Clients in the Medplum app. A
-                       real env var (CONNECTORS__MEDPLUM__CLIENT_ID), never
-                       committed to configs/connectors/medplum.yaml.
-            client_secret: That ClientApplication's secret — same rule
-                           (CONNECTORS__MEDPLUM__CLIENT_SECRET, env var only).
-        """
         self._http = httpx.AsyncClient(
             base_url=base_url,
             headers={"Content-Type": "application/fhir+json"},
             timeout=10.0,
             follow_redirects=True,
         )
-        self._token_manager = MedplumTokenManager(
-            token_url=token_url, client_id=client_id, client_secret=client_secret
+        self._token_manager = build_token_manager(
+            auth_method,
+            token_url=token_url,
+            client_id=client_id,
+            client_secret=client_secret,
+            private_key_path=private_key_path,
+            scope=scope,
+            send_secret_as="body",  # Medplum takes client_id/client_secret in the form body
         )
 
     async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:

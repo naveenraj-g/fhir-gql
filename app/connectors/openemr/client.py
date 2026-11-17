@@ -3,7 +3,7 @@ The connector for OpenEMR's standard FHIR R4 API (`/apis/default/fhir`).
 
 Like the Medplum connector it authenticates as *itself* (never forwarding
 the caller's inbound JWT), here with OAuth2 client_credentials + a signed
-JWT client assertion - see app.connectors.openemr.token_manager.
+JWT client assertion - see app.connectors.token_manager (`connectors.openemr.auth_method`).
 
 OpenEMR differs from a canonical FHIR server in ways this class absorbs:
 
@@ -25,7 +25,7 @@ import httpx
 from fastapi import HTTPException
 
 from app.auth.models import AuthUser
-from app.connectors.openemr.token_manager import OpenEmrTokenManager
+from app.connectors.token_manager import build_token_manager
 from app.core.logging import trace_methods
 
 _READ_ONLY = "The OpenEMR connector is read-only (system scopes cannot write)."
@@ -39,7 +39,9 @@ class OpenEmrConnector:
         self,
         base_url: str,
         token_url: str,
+        auth_method: str,
         client_id: str,
+        client_secret: str,
         private_key_path: str,
         scope: str,
     ) -> None:
@@ -52,9 +54,11 @@ class OpenEmrConnector:
             timeout=15.0,
             follow_redirects=True,
         )
-        self._token_manager = OpenEmrTokenManager(
+        self._token_manager = build_token_manager(
+            auth_method,
             token_url=token_url,
             client_id=client_id,
+            client_secret=client_secret,
             private_key_path=private_key_path,
             scope=scope,
         )

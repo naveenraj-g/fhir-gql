@@ -7,7 +7,7 @@ FHIR capability statement http://localhost/apis/default/fhir/metadata).
 
 ## How it logs in (system scopes, SMART Backend Services)
 
-No client secret is used. `token_manager.py` signs a short JWT (RS384) with our PRIVATE key and posts it as
+No client secret is used (`auth_method: private_key_jwt`). The shared `app/connectors/token_manager.py` signs a short JWT (RS384) with our PRIVATE key and posts it as
 `client_assertion` (`grant_type=client_credentials`). OpenEMR verifies it with the PUBLIC key (JWKS) stored on the
 client, checks `iss=sub=client_id`, `aud=token URL`, `exp`, `iat` (<= 5 min old) and a never-before-seen `jti`,
 then returns a 300 s access token. The `kid` is derived from the private key (RFC 7638 thumbprint).

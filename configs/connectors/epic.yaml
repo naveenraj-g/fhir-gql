@@ -12,3 +12,5 @@ connectors:
   epic:
     base_url: https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4
     token_url: https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token
+    # private_key_jwt (Epic backend apps) or client_secret
+    auth_method: private_key_jwt

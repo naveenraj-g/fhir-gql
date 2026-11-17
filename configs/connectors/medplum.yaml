@@ -17,4 +17,6 @@ connectors:
   medplum:
     base_url: http://localhost:8103/fhir/R4
     token_url: http://localhost:8103/oauth2/token
-    auth_mode: oauth_client_credentials
+    # client_secret (id + secret in the form body) or private_key_jwt - see
+    # app/connectors/token_manager.py
+    auth_method: client_secret
