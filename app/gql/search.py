@@ -44,7 +44,9 @@ class FhirSearchParamInput:
     value: str = strawberry.field(description="Value in FHIR search syntax.")
 
 
-@strawberry.enum(description="FHIR `_total`: how hard the server should try to count all matches.")
+@strawberry.enum(
+    description="FHIR `_total`: how hard the server should try to count all matches."
+)
 class FhirSearchTotal(Enum):
     """Maps 1:1 onto FHIR's `_total` values (the enum value is what goes on the wire)."""
 
@@ -56,7 +58,9 @@ class FhirSearchTotal(Enum):
     NONE = "none"
 
 
-@strawberry.type(description="One FHIR Bundle.link — a URL for a page of the same search.")
+@strawberry.type(
+    description="One FHIR Bundle.link — a URL for a page of the same search."
+)
 class FhirBundleLinkType:
     """Bundle.link: `relation` is self (the search as the server applied it), first,
     previous, next or last."""
@@ -65,10 +69,14 @@ class FhirBundleLinkType:
     relation: str = strawberry.field(description="self, first, previous, next or last.")
     # The backend's own URL for that page — informational for GraphQL
     # callers, who page with `offset`/`nextOffset` instead.
-    url: str = strawberry.field(description="The backend's URL for that page of results.")
+    url: str = strawberry.field(
+        description="The backend's URL for that page of results."
+    )
 
 
-def search_param_pairs(params: list[FhirSearchParamInput] | None) -> list[tuple[str, str]]:
+def search_param_pairs(
+    params: list[FhirSearchParamInput] | None,
+) -> list[tuple[str, str]]:
     """GraphQL FhirSearchParamInput list -> the (name, value) pairs
     app.connectors.fhir_search.build_search_params() takes."""
     return [(p.name, p.value) for p in params or []]
@@ -81,7 +89,9 @@ def search_param_pairs(params: list[FhirSearchParamInput] | None) -> list[tuple[
 
 IdArg = Annotated[
     str | None,
-    strawberry.argument(description="FHIR `_id`: the resource id(s), comma-separated for OR."),
+    strawberry.argument(
+        description="FHIR `_id`: the resource id(s), comma-separated for OR."
+    ),
 ]
 LastUpdatedArg = Annotated[
     str | None,
@@ -103,8 +113,12 @@ ParamsArg = Annotated[
         )
     ),
 ]
-CountArg = Annotated[int, strawberry.argument(description="Page size — FHIR `_count` (default 50).")]
-OffsetArg = Annotated[int, strawberry.argument(description="Matches to skip — `_offset` (default 0).")]
+CountArg = Annotated[
+    int, strawberry.argument(description="Page size — FHIR `_count` (default 50).")
+]
+OffsetArg = Annotated[
+    int, strawberry.argument(description="Matches to skip — `_offset` (default 0).")
+]
 SortArg = Annotated[
     str | None,
     strawberry.argument(
@@ -116,7 +130,9 @@ SortArg = Annotated[
 ]
 TotalArg = Annotated[
     FhirSearchTotal | None,
-    strawberry.argument(description="FHIR `_total`. NONE skips the count (`total` comes back null)."),
+    strawberry.argument(
+        description="FHIR `_total`. NONE skips the count (`total` comes back null)."
+    ),
 ]
 
 # Shared description tails, one per FHIR search parameter type.
@@ -124,7 +140,9 @@ STRING_DOC = (
     " FHIR string search: matches when the field equals or starts with the value, "
     "ignoring case and accents. Comma-separated values are OR'd."
 )
-TOKEN_DOC = " FHIR token: `code`, `system|code`, `|code` (no system) or `system|`. Comma = OR."
+TOKEN_DOC = (
+    " FHIR token: `code`, `system|code`, `|code` (no system) or `system|`. Comma = OR."
+)
 REFERENCE_DOC = " FHIR reference: an id, `Type/id` or an absolute URL. Comma = OR."
 
 
@@ -173,7 +191,9 @@ async def run_fhir_search(
         include=include,
         revinclude=revinclude,
     )
-    raw = await connector.get(translator.list_path(), params=query, accept=translator.accept, actor=actor)
+    raw = await connector.get(
+        translator.list_path(), params=query, accept=translator.accept, actor=actor
+    )
     return parse_searchset(translator.from_wire(raw))
 
 

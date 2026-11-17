@@ -1,5 +1,7 @@
 # Static GraphQL/Connectors + What a Truly FHIR-Standard Payload Buys Us
 
+> **Update: the gaps in section 4 are closed for Organization and Location.** fhir-server now accepts and returns genuine FHIR R4 JSON for them (`Content-Type`/`Accept: application/fhir+json`; the whole resource is stored as a FHIR document) and implements real FHIR R4 search, so the internal translators are essentially pass-through (they only add `resourceType` on create). The one thing still different from a canonical FHIR server is the path: fhir-server serves `/organizations` and `/locations`, Medplum `/Organization` and `/Location`, so each connector's translator still owns `item_path()`/`list_path()`, plus the PATCH body (a plain partial object for `internal`, an RFC 6902 array for `medplum`). The static-GraphQL decision in section 1 stands.
+
 Case study referenced throughout: `E:\work\practice\langcare-mcp-fhir` (a Go MCP
 server that fronts Epic, Cerner, Google Cloud Healthcare, OpenEMR, and generic
 FHIR R4 backends with exactly **4 tools**). This report does not touch

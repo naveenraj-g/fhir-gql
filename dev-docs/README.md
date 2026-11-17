@@ -1,5 +1,7 @@
 # Medplum → fhir-gql Feature Gap Analysis
 
+> **Status note.** These reports were written while `fhir-gql` was a Patient slice and then a many-resource gateway. The codebase now contains only **Organization and Location** (genuine FHIR R4 end to end, real FHIR R4 search on both connectors). The Medplum feature research (`01`–`09`) and the roadmap (`11`) are still useful as planning material, but resource-specific statements in them (REST routers, per-resource services/clients, sub-resource endpoints, which resources exist) describe earlier states, not the code. For what is current, read the top-level `README.md` and `app/gql/organization/__init__.py`. `15` and `17` carry their own correction notes.
+
 This folder is a systematic feature inventory of [Medplum](https://github.com/medplum/medplum)'s
 server (`packages/server`) and GraphQL engine (`packages/fhir-router/src/graphql`), read in full and
 compared feature-by-feature against what `fhir-gql` has today, to decide what's worth building next.

@@ -3,6 +3,10 @@
 ## Skills
 - Before starting any operation, check if an appropriate skill exists for it. If a matching skill is available, use it — do not implement the operation manually.
 
+## Current scope
+
+Only **Organization** and **Location** exist in this repo (`routes.enabled` in `configs/config.yaml`, `RESOURCES` in `app/gql/schema.py`). Every other resource was removed to be rebuilt on the same pattern, so do not look in git history for a "current" version of one — the Organization/Location packages are the reference. Both are genuine FHIR R4 end to end with real FHIR R4 search on both connectors; see `app/gql/organization/__init__.py` for the design and `README.md` for the layout. `dev-docs/` is planning and research material, not a description of the code (its README says which parts are current).
+
 ## Adding/Changing a FHIR Resource — This Is Only Half
 
 This gateway sits in front of `D:\code\work\projects\fhir-server` (sibling repo). When a resource (or a cross-cutting field, like `extension`) is asked for **"end to end,"** that means both repos — see fhir-server's CLAUDE.md, "What 'End-to-End' Means," and its `/new-fhir-resource` skill's Step 18 for the authoritative checklist of what this repo's own half needs: the canonical `app/fhir/schemas/<resource>.py`, **both** connector translators (`app/connectors/internal/translators/` **and** `app/connectors/medplum/translators/` — never just the one currently active in `configs/config.yaml`), the `translator_registry.py` entries, the GraphQL types (`app/gql/<resource>/types/` — any non-scalar field like `extension` needs an explicit `JSON | None` override; `all_fields=True` doesn't handle it alone), queries/mutations, and the root schema wiring.

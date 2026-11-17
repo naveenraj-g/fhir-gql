@@ -161,12 +161,16 @@ def parse_searchset(bundle: dict) -> Searchset:
         elif mode == "outcome" or resource.get("resourceType") == "OperationOutcome":
             # Surface each issue's human-readable text as one warning line.
             for issue in resource.get("issue") or []:
-                text = issue.get("diagnostics") or (issue.get("details") or {}).get("text")
+                text = issue.get("diagnostics") or (issue.get("details") or {}).get(
+                    "text"
+                )
                 if text:
                     result.warnings.append(text)
         else:
             result.matches.append(resource)
-            result.match_extensions.append((entry.get("search") or {}).get("extension") or [])
+            result.match_extensions.append(
+                (entry.get("search") or {}).get("extension") or []
+            )
 
     for link in bundle.get("link") or []:
         relation, url = link.get("relation"), link.get("url")

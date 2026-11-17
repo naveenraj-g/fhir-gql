@@ -132,8 +132,8 @@ class InternalConnector:
         handlers into a FHIR `OperationOutcome` resource, e.g.:
             {"resourceType": "OperationOutcome", "issue": [
                 {"severity": "error", "code": "invalid",
-                 "diagnostics": "Schedule 'Schedule/9' not found.",
-                 "expression": ["schedule"]}
+                 "diagnostics": "Organization 'Organization/9' not found.",
+                 "expression": ["organization"]}
             ]}
         `expression` (a field path) is only present for field-level validation errors.
 

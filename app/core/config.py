@@ -210,7 +210,7 @@ class LogConfig(BaseModel):
 class RoutesConfig(BaseModel):
     """Which resources' GraphQL queries/mutations are exposed — resource names
     are the keys of app.gql.schema.RESOURCES (e.g. "organization",
-    "practitioner_role"). Unknown names fail at startup."""
+    "location"). Unknown names fail at startup."""
 
     enabled: list[str] = Field(default_factory=list)
 

@@ -1,5 +1,7 @@
 # Resource CRUD architecture: what every resource exposes, and why
 
+> **Superseded for Organization and Location.** The sub-resource REST endpoints, `create_full` and per-array PATCH/DELETE described below belong to the earlier normalized design. Organization and Location are now stored whole by fhir-server (a FHIR document plus a search index) and exposed here as **one FHIR R4 resource**: `get…`, `search…`, `create…` (the whole resource), `update…` (merge-patch on top-level elements; a supplied list or object replaces the stored one) and `delete…`. There are no sub-resource endpoints or mutations, no `create_full`, and no cascade concern for the gateway. The rule that GraphQL mirrors the backend one to one still holds. Keep this document only as history for the normalized resources.
+
 The endpoint shape every FHIR resource in this project should follow — decided once, here, so
 every future resource (and every review of an existing one) can check itself against one rule
 instead of re-litigating it per resource. Route-level (REST + GraphQL) and database-level

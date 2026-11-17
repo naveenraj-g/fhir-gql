@@ -1,5 +1,7 @@
 # Resource Rollout Plan
 
+> **Status note.** Written when resources were being ported over from a sibling project. Only Organization and Location remain in this repo; the other resources were removed to be rebuilt later on the Organization/Location pattern (genuine FHIR R4 end to end, not the REST + service + client layering described below). Treat the rollout order as a dependency guide, not as a description of the code.
+
 Scope: **which FHIR resources to add next, in what order, and how much REST vs. GraphQL work each one is** — a dimension the `01`–`09` reports don't cover, since those are about Medplum's platform *features*, not about fhir-gql's own resource coverage.
 
 ## Where this comes from

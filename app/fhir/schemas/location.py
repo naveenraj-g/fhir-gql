@@ -6,8 +6,9 @@ module's docstring for the overall rationale.
 
 Lives at the app level (app.fhir), not under any one connector, for the
 same reason Organization's canonical shape does: app.connectors.internal.translators.location
-and app.connectors.medplum.translators.location both translate their
-connector's own wire format to/from this same shape (see
+and app.connectors.medplum.translators.location both speak this same shape
+(genuine FHIR R4 JSON, so they pass it through; only paths, search wiring and the
+PATCH body differ — see
 app.connectors.base.LocationWireTranslator), and app.gql.location's
 types/queries/mutations import these models directly.
 

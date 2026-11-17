@@ -5,8 +5,9 @@ boundary itself.
 
 Lives at the app level (app.fhir), not under any one connector, because
 it isn't connector-specific: app.connectors.internal.translators.organization
-and app.connectors.medplum.translators.organization both translate their
-connector's own wire format to/from this same shape (see
+and app.connectors.medplum.translators.organization both speak this same shape
+(genuine FHIR R4 JSON, so they pass it through; only paths, search wiring and the
+PATCH body differ — see
 app.connectors.base.OrganizationWireTranslator), and app.gql.organization's
 types/queries/mutations import these models directly as the GraphQL
 boundary's canonical shape, rather than redefining a second, drifting copy

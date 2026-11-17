@@ -1,11 +1,12 @@
 """
 Mutation fields for the Location resource — same genuinely FHIR R4-shaped
 input/output regardless of which connector (internal, medplum, ...) is
-actually active; each connector's translator maps this shape onto its own
-write conventions. Mirrors app.gql.organization.mutations exactly — see
-that module and app.gql.organization's package docstring, and
-app.connectors.base.LocationWireTranslator's docstring for why write
-translation is NOT a pass-through for `internal` the way reads are.
+actually active. Mirrors app.gql.organization.mutations exactly. The input is a FHIR R4 Location and is sent to the
+backend as-is: `internal` (fhir-server) takes a FHIR body for create and a
+plain partial-object merge-patch for update, `medplum` needs an RFC 6902
+JSON Patch array for update — that PATCH difference is the only write
+translation left (see app.connectors.base.LocationWireTranslator and
+app.gql.location's package docstring).
 """
 
 from typing import Annotated

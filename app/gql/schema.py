@@ -2,30 +2,13 @@
 Composes the GraphQL schema from per-domain Query/Mutation resolver mixins
 and exposes it as a FastAPI-mountable router.
 
-Organization, Location, HealthcareService, Practitioner,
-PractitionerRole, Schedule, Slot, Appointment, AppointmentResponse,
-Encounter, Questionnaire, and QuestionnaireResponse are the FHIR
-resources this gateway exposes. All twelve are genuinely FHIR R4-shaped
-end-to-end (see app.gql.organization's package docstring, which
-app.gql.location, app.gql.healthcare_service, app.gql.practitioner,
-app.gql.practitioner_role, app.gql.schedule, app.gql.slot,
-app.gql.appointment, app.gql.appointment_response, app.gql.encounter,
-app.gql.questionnaire, and app.gql.questionnaire_response all mirror
-exactly) — their resolvers call the active connector directly and
-translate via
+Organization and Location are the FHIR resources this gateway exposes. Both
+are genuinely FHIR R4-shaped end-to-end (see app.gql.organization's package
+docstring, which app.gql.location mirrors exactly) — their resolvers call the
+active connector directly and translate via
 app.connectors.translator_registry.active_organization_translator()/
-active_location_translator()/active_healthcare_service_translator()/
-active_practitioner_translator()/active_practitioner_role_translator()/
-active_schedule_translator()/active_slot_translator()/
-active_appointment_translator()/active_appointment_response_translator()/
-active_encounter_translator()/active_questionnaire_translator()/
-active_questionnaire_response_translator(), keyed off
-`settings.connectors.active`, rather than going through a per-resource
-service/client layer. QuestionnaireResponse is the one exception to the
-"genuinely FHIR R4-shaped, no extra fields" rule on write — see
-app.connectors.internal.translators.questionnaire_response's module
-docstring for why its own `to_wire_create`/`to_wire_patch` take extra
-keyword-only arguments unlike every other resource's translator.
+active_location_translator(), keyed off `settings.connectors.active`, rather
+than going through a per-resource service/client layer.
 
 Which resources are exposed is driven by configs/config.yaml's
 `routes.enabled` (mirrors fhir-server). Adding another resource means: write
@@ -50,22 +33,12 @@ from app.gql.test_subscription import TestQuery, TestSubscription
 # (package, Query mixin, Mutation mixin). Modules are imported lazily, only
 # for enabled resources. Add a new resource here once its package exists.
 RESOURCES: dict[str, tuple[str, str, str]] = {
-    "organization": ("organization", "FhirOrganizationQuery", "FhirOrganizationMutation"),
+    "organization": (
+        "organization",
+        "FhirOrganizationQuery",
+        "FhirOrganizationMutation",
+    ),
     "location": ("location", "FhirLocationQuery", "FhirLocationMutation"),
-    "healthcare_service": ("healthcare_service", "FhirHealthcareServiceQuery", "FhirHealthcareServiceMutation"),
-    "practitioner": ("practitioner", "FhirPractitionerQuery", "FhirPractitionerMutation"),
-    "practitioner_role": ("practitioner_role", "FhirPractitionerRoleQuery", "FhirPractitionerRoleMutation"),
-    "schedule": ("schedule", "FhirScheduleQuery", "FhirScheduleMutation"),
-    "slot": ("slot", "FhirSlotQuery", "FhirSlotMutation"),
-    "appointment": ("appointment", "FhirAppointmentQuery", "FhirAppointmentMutation"),
-    "appointment_response": ("appointment_response", "FhirAppointmentResponseQuery", "FhirAppointmentResponseMutation"),
-    "encounter": ("encounter", "FhirEncounterQuery", "FhirEncounterMutation"),
-    "questionnaire": ("questionnaire", "FhirQuestionnaireQuery", "FhirQuestionnaireMutation"),
-    "questionnaire_response": ("questionnaire_response", "FhirQuestionnaireResponseQuery", "FhirQuestionnaireResponseMutation"),
-    "service_request": ("service_request", "FhirServiceRequestQuery", "FhirServiceRequestMutation"),
-    "medication_request": ("medication_request", "FhirMedicationRequestQuery", "FhirMedicationRequestMutation"),
-    "observation": ("observation", "FhirObservationQuery", "FhirObservationMutation"),
-    "diagnostic_report": ("diagnostic_report", "FhirDiagnosticReportQuery", "FhirDiagnosticReportMutation"),
 }
 
 
@@ -89,7 +62,9 @@ def _compose(enabled: list[str]) -> tuple[type, type | None]:
             getattr(importlib.import_module(f"app.gql.{package}.queries"), query_name)
         )
         mutation_bases.append(
-            getattr(importlib.import_module(f"app.gql.{package}.mutations"), mutation_name)
+            getattr(
+                importlib.import_module(f"app.gql.{package}.mutations"), mutation_name
+            )
         )
 
     # GraphQL requires a Query root with at least one field — TestQuery.hello
@@ -106,7 +81,9 @@ def _compose(enabled: list[str]) -> tuple[type, type | None]:
             type(
                 "Mutation",
                 tuple(mutation_bases),
-                {"__doc__": "Root GraphQL mutation type — composed from routes.enabled."},
+                {
+                    "__doc__": "Root GraphQL mutation type — composed from routes.enabled."
+                },
             )
         )
         if mutation_bases

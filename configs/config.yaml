@@ -76,17 +76,3 @@ routes:
   enabled:
     - organization
     - location
-    # - healthcare_service
-    # - practitioner
-    # - practitioner_role
-    # - schedule
-    # - slot
-    # - appointment
-    # - appointment_response
-    # - encounter
-    # - questionnaire
-    # - questionnaire_response
-    # - service_request
-    # - medication_request
-    # - observation
-    # - diagnostic_report
