@@ -10,3 +10,6 @@ wheels/
 .venv
 
 .env
+
+# Local private keys (e.g. the OpenEMR connector signing key) - never commit
+secrets/

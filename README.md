@@ -13,7 +13,9 @@ Client (web / mobile / AI agent)
    fhir-gql  (this service: auth, RBAC, rate limit, schema)
         │  one active connector, chosen by config
         ├──────────────► internal  = our own fhir-server (`/organizations`, `/locations`)
-        └──────────────► medplum   = a Medplum server (`/Organization`, `/Location`)
+        ├──────────────► medplum   = a Medplum server (`/Organization`, `/Location`)
+        ├──────────────► openemr   = OpenEMR's FHIR R4 API (`/Organization`, `/Location`)
+        └──────────────► epic      = Epic on FHIR sandbox, read-only (`/Organization`, `/Location`)
 ```
 
 GraphQL is the only transport — there is no REST layer. `GET /health` exists for probes.
@@ -86,10 +88,15 @@ just dev                       # uvicorn app.main:app --port 8005 --reload
 - `.env` needs a BetterAuth-compatible IAM issuer for JWT validation (`IAM_JWKS_URL`, `IAM_ISSUER`).
   `REDIS_URL` is used for rate limiting and falls back to an in-process store if Redis is
   unreachable (`redis.enabled: false` skips it).
-- Which backend is live: `connectors.active` in `configs/config.yaml` (`internal` or `medplum`).
+- Which backend is live: `connectors.active` in `configs/config.yaml` (`internal`, `medplum`, `openemr` or `epic`).
   Each connector's own settings are in `configs/connectors/<name>.yaml`; the fhir-server address is
   `connectors.internal.base_url` (override with `CONNECTORS__INTERNAL__BASE_URL`). Medplum needs
-  `CONNECTORS__MEDPLUM__CLIENT_ID` and `…__CLIENT_SECRET`.
+  `CONNECTORS__MEDPLUM__CLIENT_ID` and `…__CLIENT_SECRET`. OpenEMR needs
+  `CONNECTORS__OPENEMR__CLIENT_ID` and `…__PRIVATE_KEY_PATH` (an RSA private key; the matching public
+  JWKS is registered in OpenEMR). It logs in with a signed JWT (RS384), not a secret. OpenEMR limits
+  (verified live): with these system scopes it is **read-only** here (writes answer 405). `epic` is read-only too. Location has no write routes,
+  Organization has no delete, and Organization create/update need an admin user login that system
+  scopes can't provide (401). Scopes are `connectors.openemr.scope`.
 - Any setting can be overridden by an environment variable using `__` for nesting.
 
 ## Extending with another resource

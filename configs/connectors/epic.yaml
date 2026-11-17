@@ -1,0 +1,14 @@
+# Connector settings for Epic on FHIR (R4), the public sandbox by default. See
+# app/connectors/epic/client.py.
+#
+# client_id and private_key_path are deliberately NOT here - set them via the
+# real env vars CONNECTORS__EPIC__CLIENT_ID (the Non-Production Client ID from
+# fhir.epic.com -> My Apps) and CONNECTORS__EPIC__PRIVATE_KEY_PATH (e.g. in
+# .env). The private key lives under secrets/ (gitignored), never committed.
+#
+# token_url is also the JWT audience. No scope is sent: Epic grants the APIs
+# ticked on the app registration (Organization/Location read).
+connectors:
+  epic:
+    base_url: https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4
+    token_url: https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token

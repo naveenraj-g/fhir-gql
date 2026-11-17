@@ -1,0 +1,20 @@
+# Connector settings for OpenEMR's standard FHIR R4 API (local Docker instance
+# in docker/connectors/openemr). See app/connectors/openemr/client.py.
+#
+# client_id and private_key_path are deliberately NOT here - set them via the
+# real env vars CONNECTORS__OPENEMR__CLIENT_ID and
+# CONNECTORS__OPENEMR__PRIVATE_KEY_PATH (e.g. in .env). The private key file
+# itself lives under secrets/ (gitignored) and must never be committed.
+#
+# token_url is also the JWT audience, so it must equal OpenEMR's own token
+# endpoint exactly (OpenEMR's Site Address Override = http://localhost).
+#
+# scope must list every operation the gateway may perform AND be a subset of
+# what the client was registered with in OpenEMR. With system scopes only reads
+# work: OpenEMR has no system/*.write scope for Organization (its create/update
+# need an admin user login) and Location is read-only.
+connectors:
+  openemr:
+    base_url: http://localhost/apis/default/fhir
+    token_url: http://localhost/oauth2/default/token
+    scope: "system/Organization.read system/Location.read"

@@ -18,6 +18,10 @@ Organization/Location ones are written, then add a corresponding
 helper below.
 """
 
+from app.connectors.epic.translators import (
+    EpicLocationTranslator,
+    EpicOrganizationTranslator,
+)
 from app.connectors.internal.translators import (
     InternalLocationTranslator,
     InternalOrganizationTranslator,
@@ -26,16 +30,24 @@ from app.connectors.medplum.translators import (
     MedplumLocationTranslator,
     MedplumOrganizationTranslator,
 )
+from app.connectors.openemr.translators import (
+    OpenEmrLocationTranslator,
+    OpenEmrOrganizationTranslator,
+)
 from app.core.config import settings
 
 ORGANIZATION_TRANSLATORS = {
     "internal": InternalOrganizationTranslator(),
     "medplum": MedplumOrganizationTranslator(),
+    "openemr": OpenEmrOrganizationTranslator(),
+    "epic": EpicOrganizationTranslator(),
 }
 
 LOCATION_TRANSLATORS = {
     "internal": InternalLocationTranslator(),
     "medplum": MedplumLocationTranslator(),
+    "openemr": OpenEmrLocationTranslator(),
+    "epic": EpicLocationTranslator(),
 }
 
 

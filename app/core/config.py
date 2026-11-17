@@ -92,6 +92,37 @@ class MedplumConnectorConfig(BaseModel):
     client_secret: str = ""
 
 
+class OpenEmrConnectorConfig(BaseModel):
+    """Checked-in behavior for the openemr connector (OpenEMR's standard FHIR
+    R4 API, system scopes + signed-JWT client login). See
+    configs/connectors/openemr.yaml.
+
+    client_id/private_key_path default to "" - real per-environment values,
+    env vars only (CONNECTORS__OPENEMR__CLIENT_ID / _PRIVATE_KEY_PATH).
+    OpenEmrTokenManager raises at construction if either is empty, so a
+    deployment with connectors.active: openemr but no credentials fails at
+    startup instead of 401ing on first use."""
+
+    base_url: str = "http://localhost/apis/default/fhir"
+    token_url: str = "http://localhost/oauth2/default/token"
+    scope: str = "system/Organization.read system/Location.read"
+    client_id: str = ""
+    private_key_path: str = ""
+
+
+class EpicConnectorConfig(BaseModel):
+    """Checked-in behavior for the epic connector (Epic on FHIR R4, read-only,
+    SMART Backend Services signed-JWT login). See configs/connectors/epic.yaml.
+    client_id/private_key_path default to "" - env vars only
+    (CONNECTORS__EPIC__CLIENT_ID / _PRIVATE_KEY_PATH); the token manager
+    raises at construction if either is empty."""
+
+    base_url: str = "https://fhir.epic.com/interconnect-fhir-oauth/api/FHIR/R4"
+    token_url: str = "https://fhir.epic.com/interconnect-fhir-oauth/oauth2/token"
+    client_id: str = ""
+    private_key_path: str = ""
+
+
 class ConnectorsConfig(BaseModel):
     """Selects which backend system this gateway's resource clients and
     services talk to — see app.connectors.base.Connector (the interface)
@@ -116,7 +147,7 @@ class ConnectorsConfig(BaseModel):
     CONNECTORS__EPIC__CLIENT_ID, never committed YAML), and extending the
     Literal below to match — then `active` can be flipped to it."""
 
-    active: Literal["internal", "medplum"] = "internal"
+    active: Literal["internal", "medplum", "openemr", "epic"] = "internal"
 
     # Per-connector behavior sub-config — one field per entry in
     # app.connectors.registry.CONNECTORS, each populated from its own
@@ -125,6 +156,8 @@ class ConnectorsConfig(BaseModel):
         default_factory=InternalConnectorConfig
     )
     medplum: MedplumConnectorConfig = Field(default_factory=MedplumConnectorConfig)
+    openemr: OpenEmrConnectorConfig = Field(default_factory=OpenEmrConnectorConfig)
+    epic: EpicConnectorConfig = Field(default_factory=EpicConnectorConfig)
 
 
 class CorsConfig(BaseModel):
@@ -297,6 +330,16 @@ class Settings(BaseSettings):
             yaml_file="configs/connectors/medplum.yaml",
             yaml_file_encoding="utf-8",
         )
+        openemr_yaml_settings = YamlConfigSettingsSource(
+            settings_cls,
+            yaml_file="configs/connectors/openemr.yaml",
+            yaml_file_encoding="utf-8",
+        )
+        epic_yaml_settings = YamlConfigSettingsSource(
+            settings_cls,
+            yaml_file="configs/connectors/epic.yaml",
+            yaml_file_encoding="utf-8",
+        )
         return (
             init_settings,
             env_settings,
@@ -304,6 +347,8 @@ class Settings(BaseSettings):
             yaml_settings,
             connector_yaml_settings,
             medplum_yaml_settings,
+            openemr_yaml_settings,
+            epic_yaml_settings,
             file_secret_settings,
         )
 

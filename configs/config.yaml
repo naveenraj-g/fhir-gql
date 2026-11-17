@@ -24,6 +24,7 @@ connectors:
   # connector's name here once one is registered in
   # app/connectors/registry.py. Each connector's own settings (base_url,
   # auth_mode, ...) live in configs/connectors/<name>.yaml, not here.
+  # Options: internal | medplum | openemr | epic.
   active: internal
 
 cors:

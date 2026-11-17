@@ -57,6 +57,21 @@ class CoreContainer(containers.DeclarativeContainer):
             client_id=settings.connectors.medplum.client_id,
             client_secret=settings.connectors.medplum.client_secret,
         ),
+        openemr=providers.Singleton(
+            CONNECTORS["openemr"],
+            base_url=settings.connectors.openemr.base_url,
+            token_url=settings.connectors.openemr.token_url,
+            client_id=settings.connectors.openemr.client_id,
+            private_key_path=settings.connectors.openemr.private_key_path,
+            scope=settings.connectors.openemr.scope,
+        ),
+        epic=providers.Singleton(
+            CONNECTORS["epic"],
+            base_url=settings.connectors.epic.base_url,
+            token_url=settings.connectors.epic.token_url,
+            client_id=settings.connectors.epic.client_id,
+            private_key_path=settings.connectors.epic.private_key_path,
+        ),
     )
 
     # Singleton provider for the Terminology HTTP client.

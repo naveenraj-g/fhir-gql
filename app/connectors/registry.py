@@ -19,8 +19,10 @@ etc. — see InternalConnectorConfig for the pattern; real secrets like
 client_id/secret are env vars, never committed YAML).
 """
 
+from app.connectors.epic import EpicConnector
 from app.connectors.internal import InternalConnector
 from app.connectors.medplum import MedplumConnector
+from app.connectors.openemr import OpenEmrConnector
 
 CONNECTORS = {
     # "This application" — our own fhir-server. Named "internal" (not
@@ -34,4 +36,10 @@ CONNECTORS = {
     # see app.connectors.medplum's module docstring. Registered here but
     # not active by default (see ConnectorsConfig.active's default).
     "medplum": MedplumConnector,
+    # OpenEMR's standard FHIR R4 API - OAuth2 client_credentials with a signed
+    # JWT client assertion (system scopes). See app.connectors.openemr.
+    "openemr": OpenEmrConnector,
+    # Epic on FHIR (R4), read-only, SMART Backend Services signed-JWT login.
+    # See app.connectors.epic.
+    "epic": EpicConnector,
 }
