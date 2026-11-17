@@ -54,6 +54,9 @@ Permissions are `<resource>:read|create|update|delete`, read from the JWT.
 Which resources are in the schema is set by `routes.enabled` in `configs/config.yaml` (names are the
 keys of `RESOURCES` in `app/gql/schema.py`); a restart is required.
 
+**Per-connector capabilities** (which operations and FHIR search parameters each backend supports, and how it behaves
+when one is not supported) are in [`docs/connector-capabilities.md`](docs/connector-capabilities.md).
+
 ## Directory layout
 
 ```
