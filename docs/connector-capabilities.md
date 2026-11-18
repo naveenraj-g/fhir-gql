@@ -210,7 +210,9 @@ Spec: [search.html#standard](https://hl7.org/fhir/R4/search.html#standard).
 - **ORA (L, D):** [Organization search](https://docs.oracle.com/en/industries/health/millennium-platform-apis/mfrap/op-organization-get.html)
   and [Location search](https://docs.oracle.com/en/industries/health/millennium-platform-apis/mfrap/op-location-get.html)
   document `_count` (default 100). Tested: `_count=0` gives 400 (`_count: value must be at least 1`); `_count=500`
-  returns 100. Organization bundles carry `total` (116 in one search); Location bundles did not. Paging is by `next` link.
+  returns 100. Organization bundles carry `total` (116 in one search); Location bundles did not. Paging is by `next` link, and
+  that link uses `-offset=5` (a hyphen), not `_offset`, so the gateway's `nextOffset` comes back null for Oracle. Epic's `next`
+  link is an opaque `?sessionID=...`, so `nextOffset` is null there too.
 
 ### 3.3 Modifiers, prefixes and search mechanics
 
