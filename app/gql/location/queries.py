@@ -21,8 +21,6 @@ from typing import Annotated
 import strawberry
 
 from app.connectors.translator_registry import active_location_translator
-from app.fhir.schemas.location import FhirLocationResponse
-from app.fhir.schemas.organization import FhirOrgResponse
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
 from app.gql.location.search_params import (
@@ -50,7 +48,6 @@ from app.gql.location.types.search import (
     FhirLocationDistanceType,
     FhirLocationSearchResult,
 )
-from app.gql.organization.types.response import FhirOrganizationType
 from app.gql.permissions import require_gql_permission
 from app.gql.search import (
     CountArg,
@@ -67,6 +64,7 @@ from app.gql.search import (
 # The FHIR extension a `near` match carries its distance in.
 _DISTANCE_URL = "http://hl7.org/fhir/StructureDefinition/location-distance"
 
+
 async def _run_search(info, **search):
     """One Location FHIR search on the active connector — see
     app.gql.search.run_fhir_search."""
@@ -78,7 +76,7 @@ async def _run_search(info, **search):
 def _location(resource: dict) -> FhirLocationType:
     """One FHIR Location dict -> its GraphQL type (validated through the
     canonical Pydantic model first)."""
-    return FhirLocationType.from_pydantic(FhirLocationResponse.model_validate(resource))
+    return resource
 
 
 def _distances(result) -> list[FhirLocationDistanceType]:
@@ -197,9 +195,7 @@ class FhirLocationQuery:
                 if r.get("resourceType") == "Location"
             ],
             included_organizations=[
-                FhirOrganizationType.from_pydantic(FhirOrgResponse.model_validate(r))
-                for r in result.included
-                if r.get("resourceType") == "Organization"
+                r for r in result.included if r.get("resourceType") == "Organization"
             ],
             included=result.included,
             distances=_distances(result),

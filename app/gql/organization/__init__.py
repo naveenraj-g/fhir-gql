@@ -4,7 +4,7 @@ The Organization resource on the GraphQL gateway.
 One canonical, genuinely FHIR R4-shaped Organization, whichever connector
 (internal = our own fhir-server, medplum) is active. There is no per-field
 mapping anywhere in this package: the GraphQL types, the Pydantic models
-(app.fhir.schemas.organization) and both backends all speak FHIR R4 JSON, and
+(app.schemas.fhir_resources, shared with fhir-server) and both backends all speak FHIR R4 JSON, and
 a connector translator only supplies the URL paths, the search wiring and the
 PATCH body shape.
 
@@ -21,7 +21,7 @@ Layout:
                     arguments, plus `fhir_filters()` which maps them back to
                     FHIR parameter names.
 - types/            GraphQL object, input and search-result types, generated
-                    from app.fhir.schemas.organization.
+                    from app.schemas.fhir_resources (see app.gql.fhir_types).
 
 Request path: resolver -> `require_gql_permission` -> the active connector
 (`app.connectors.translator_registry.active_organization_translator()` for

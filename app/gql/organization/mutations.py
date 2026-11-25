@@ -14,12 +14,16 @@ from typing import Annotated
 import strawberry
 
 from app.connectors.translator_registry import active_organization_translator
-from app.fhir.schemas.organization import FhirOrgResponse
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
-from app.gql.organization.types.input import FhirOrganizationInput
+from app.gql.fhir_types import input_to_dict
+from app.gql.organization.types.input import (
+    FhirOrganizationInput,
+    FhirOrganizationPatchInput,
+)
 from app.gql.organization.types.response import FhirOrganizationType
 from app.gql.permissions import require_gql_permission
+from app.schemas.fhir_resources import Organization, OrganizationPatch
 
 
 @strawberry.type(description="Mutation fields for the Organization resource.")
@@ -47,7 +51,10 @@ class FhirOrganizationMutation:
         actor = require_gql_permission(info, "organization", "create")
         connector = get_container(info).core.fhir_client()
         translator = active_organization_translator()
-        data = input.to_pydantic().model_dump(exclude_none=True, mode="json")
+        # The input object back to the FHIR document it stands for, checked against the model
+        # (a ValidationError becomes a GraphQL error) before it is sent to the backend.
+        data = input_to_dict(input)
+        Organization.model_validate(data)
         raw = await connector.post(
             translator.list_path(),
             translator.to_wire_create(data),
@@ -55,9 +62,7 @@ class FhirOrganizationMutation:
             accept=translator.accept,
             inject_audit=False,
         )
-        return FhirOrganizationType.from_pydantic(
-            FhirOrgResponse.model_validate(translator.from_wire(raw))
-        )
+        return translator.from_wire(raw)
 
     @strawberry.mutation(
         description=(
@@ -72,7 +77,7 @@ class FhirOrganizationMutation:
         info: strawberry.types.Info,
         id: Annotated[str, strawberry.argument(description="FHIR resource id.")],
         input: Annotated[
-            FhirOrganizationInput,
+            FhirOrganizationPatchInput,
             strawberry.argument(description="Fields to update, in FHIR R4 shape."),
         ],
     ) -> FhirOrganizationType:
@@ -80,7 +85,9 @@ class FhirOrganizationMutation:
         actor = require_gql_permission(info, "organization", "update")
         connector = get_container(info).core.fhir_client()
         translator = active_organization_translator()
-        data = input.to_pydantic().model_dump(exclude_none=True, mode="json")
+        # The merge-patch the caller supplied, as a FHIR fragment, checked against the patch model.
+        data = input_to_dict(input)
+        OrganizationPatch.model_validate(data)
         raw = await connector.patch(
             translator.item_path(id),
             translator.to_wire_patch(data),
@@ -88,9 +95,7 @@ class FhirOrganizationMutation:
             accept=translator.accept,
             inject_audit=False,
         )
-        return FhirOrganizationType.from_pydantic(
-            FhirOrgResponse.model_validate(translator.from_wire(raw))
-        )
+        return translator.from_wire(raw)
 
     @strawberry.mutation(
         description=(

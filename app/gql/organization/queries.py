@@ -30,7 +30,6 @@ from typing import Annotated
 import strawberry
 
 from app.connectors.translator_registry import active_organization_translator
-from app.fhir.schemas.organization import FhirOrgResponse
 from app.gql.context import get_container
 from app.gql.errors import translate_errors
 from app.gql.organization.search_params import (
@@ -71,14 +70,20 @@ async def _run_search(info, **search):
     """One Organization FHIR search on the active connector — see
     app.gql.search.run_fhir_search."""
     return await run_fhir_search(
-        info, resource="organization", translator=active_organization_translator(), **search
+        info,
+        resource="organization",
+        translator=active_organization_translator(),
+        **search,
     )
 
 
 def _organization(resource: dict) -> FhirOrganizationType:
-    """One FHIR Organization dict -> its GraphQL type (validated through
-    the canonical Pydantic model first)."""
-    return FhirOrganizationType.from_pydantic(FhirOrgResponse.model_validate(resource))
+    """One FHIR Organization dict -> what a resolver returns for FhirOrganizationType.
+
+    The type reads the FHIR dict directly (see app.gql.fhir_types), so the backend's JSON is
+    passed through unchanged - nothing is validated on a read, so one record that lacks an
+    element R4 requires (another EHR's data) cannot fail the query."""
+    return resource
 
 
 @strawberry.type(description="Query fields for the Organization resource.")
@@ -143,14 +148,29 @@ class FhirOrganizationQuery:
         result = await _run_search(
             info,
             filters=fhir_filters(
-                id=id, last_updated=last_updated, name=name, phonetic=phonetic,
-                active=active, identifier=identifier, type=type, address=address,
-                address_city=address_city, address_state=address_state,
-                address_postal_code=address_postal_code, address_country=address_country,
-                address_use=address_use, partof=partof, endpoint=endpoint,
+                id=id,
+                last_updated=last_updated,
+                name=name,
+                phonetic=phonetic,
+                active=active,
+                identifier=identifier,
+                type=type,
+                address=address,
+                address_city=address_city,
+                address_state=address_state,
+                address_postal_code=address_postal_code,
+                address_country=address_country,
+                address_use=address_use,
+                partof=partof,
+                endpoint=endpoint,
             ),
-            params=params, count=count, offset=offset, sort=sort, total=total,
-            include=include, revinclude=revinclude,
+            params=params,
+            count=count,
+            offset=offset,
+            sort=sort,
+            total=total,
+            include=include,
+            revinclude=revinclude,
         )
         return FhirOrganizationSearchResult(
             total=result.total,
@@ -197,7 +217,9 @@ class FhirOrganizationQuery:
         params: ParamsArg = None,
         limit: Annotated[
             int,
-            strawberry.argument(description="Page size — sent as FHIR `_count` (default 50)."),
+            strawberry.argument(
+                description="Page size — sent as FHIR `_count` (default 50)."
+            ),
         ] = 50,
         offset: OffsetArg = 0,
         sort: SortArg = None,
@@ -208,13 +230,28 @@ class FhirOrganizationQuery:
         result = await _run_search(
             info,
             filters=fhir_filters(
-                id=id, last_updated=last_updated, name=name, phonetic=phonetic,
-                active=active, identifier=identifier, type=type, address=address,
-                address_city=address_city, address_state=address_state,
-                address_postal_code=address_postal_code, address_country=address_country,
-                address_use=address_use, partof=partof, endpoint=endpoint,
+                id=id,
+                last_updated=last_updated,
+                name=name,
+                phonetic=phonetic,
+                active=active,
+                identifier=identifier,
+                type=type,
+                address=address,
+                address_city=address_city,
+                address_state=address_state,
+                address_postal_code=address_postal_code,
+                address_country=address_country,
+                address_use=address_use,
+                partof=partof,
+                endpoint=endpoint,
             ),
-            params=params, count=limit, offset=offset, sort=sort, total=None,
-            include=None, revinclude=None,
+            params=params,
+            count=limit,
+            offset=offset,
+            sort=sort,
+            total=None,
+            include=None,
+            revinclude=None,
         )
         return [_organization(r) for r in result.matches]

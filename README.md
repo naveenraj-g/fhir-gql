@@ -32,7 +32,7 @@ GraphQL resolver (app/gql/<resource>/queries.py, mutations.py)
 ```
 
 - The resource is **genuine FHIR R4 JSON end to end**. The GraphQL types are generated from the
-  Pydantic models in `app/fhir/schemas/`, and both backends speak the same shape, so there is no
+  Pydantic models in `app/schemas/` (generated in fhir-server, copied by `scripts/sync_schemas.py`), and both backends speak the same shape, so there is no
   per-field mapping. A translator only supplies the URL paths, the search wiring and the PATCH body
   (`internal`: a plain partial object; `medplum`: an RFC 6902 JSON Patch array).
 - **Search is real FHIR R4 search** on both backends (`app/connectors/fhir_search.py`). Every R4
@@ -111,7 +111,7 @@ just dev                       # uvicorn app.main:app --port 8005 --reload
 
 A resource is not finished until it works on **both** connectors. The pieces:
 
-1. `app/fhir/schemas/<resource>.py`: the FHIR R4 Pydantic models (mirror `organization.py`).
+1. `app/schemas/fhir_resources/<resource>.py`: already there (synced from fhir-server); the GraphQL types are two lines in `app/gql/<resource>/types/` using `app/gql/fhir_types.py`.
 2. `app/connectors/internal/translators/<resource>.py` and
    `app/connectors/medplum/translators/<resource>.py`, exported from each `translators/__init__.py`.
 3. A `<RESOURCE>_TRANSLATORS` dict and `active_<resource>_translator()` in
